@@ -9,6 +9,7 @@
 | **Vorgänger** | [Konzeptpapier v0.1](../README.md) |
 | **Ziel dieser Phase** | Belastbares Anforderungsdokument als Grundlage für den PoC (P1) |
 | **Abschlusskriterium** | Alle Anforderungen haben ein Prüfkriterium; alle `U`-Einträge sind geklärt; mindestens zwei externe Reviews liegen vor |
+| **Bisherige Ergebnisse** | [Befunde aus der Referenzimplementierung](p0-befunde.md) — F-1 bis F-5, in dieses Dokument eingearbeitet |
 
 ---
 
@@ -189,8 +190,8 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 |---|---|---|---|
 | SR-1 | Jedes Profil besitzt einen unabhängig erzeugten Schlüssel; kein gemeinsamer Master-Key | MUSS | Code-Review + Nachweis, dass aus `profile_key_B` kein Bezug zu `profile_key_A` ableitbar ist |
 | SR-2 | Nach dem Entsperren von Profil B existiert kein Schlüsselmaterial von Profil A im RAM | MUSS | Speicherabbild des laufenden Systems, gezielte Suche nach Schlüsselmustern |
-| SR-3 | Die PIN-Auswertung läuft in konstanter Zeit, unabhängig von Treffer und Profilanzahl | MUSS | Messreihe ≥10.000 Eingaben, statistischer Nachweis, dass keine trennbaren Verteilungen entstehen |
-| SR-4 | Jedes Profil hat einen eigenen Fehlversuchszähler in Hardware | MUSS | Test: Fehlversuche in Profil B verändern das Sperrverhalten von Profil A nicht |
+| SR-3 | Die PIN-Auswertung läuft in konstanter Zeit, unabhängig von Treffer und Profilanzahl | MUSS | Messreihe ≥10.000 Eingaben; **alle Eingabeklassen in einer Sitzung verschränkt, Reihenfolge je Runde zufällig** (F-4); Welch-t je Klassenpaar unter 4,5 |
+| SR-4 | Jedes Profil hat einen eigenen Fehlversuchszähler in Hardware. **Eine erfolgreiche** Entsperrung setzt nur den eigenen Zähler zurück und lässt fremde unberührt | MUSS | Test: erfolgreiche Entsperrung von B verändert den Zähler von A nicht. **Für Fehlversuche gilt das nicht und kann es nicht gelten** — siehe F-1 |
 | SR-5 | Die PIN-Ableitung ist hardwaregebunden; Offline-Angriff auf ein Speicherabbild ist wirkungslos | MUSS | Extraktionstest: Abbild ohne Secure Element ist nicht angreifbar |
 | SR-6 | Kein personenbezogener Inhalt in `DE`-Speicher | MUSS | Vollständige Inventarisierung des `DE`-Bereichs vor und nach Nutzung |
 | SR-7 | Kein profilübergreifendes IPC, keine geteilte Zwischenablage, kein geteilter Benachrichtigungsverlauf | MUSS | Systematischer Testkatalog je IPC-Kanal |
@@ -198,6 +199,7 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 | SR-9 | Bootzeit, Ressourcenverbrauch und Logs sind unabhängig von der Profilanzahl | SOLL | Messreihe + Log-Diff |
 | SR-10 | Bei deaktiviertem Feature sind die MLSU-Codepfade nicht erreichbar | MUSS | Code-Review + Test auf Standardkonfiguration |
 | SR-11 | Sicheres Löschen eines Profils hinterlässt kein Indiz für dessen vorherige Existenz | SOLL | Forensische Nachanalyse nach Löschung |
+| SR-12 | Die Authentizitätsprüfung beim Entpacken eines Slots liefert ein Flag in konstanter Zeit, keinen Ausnahme- oder Fehlerpfad | MUSS | Code-Review der Krypto-Anbindung; Auswahlkriterium für die Bibliothek (F-3) |
 
 ### 5.2 Funktionale Anforderungen
 
@@ -240,10 +242,11 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 | # | Entscheidung | Empfehlung | Begründung |
 |---|---|---|---|
 | D1 | Eigenständiger Mechanismus oder Aufsatz auf Private Space | **Zuerst Private Space prüfen** | Wenn K1/K3/K5 dort bereits erfüllt sind, reduziert sich MLSU auf den PIN-Auswahlpfad — deutlich kleinerer, besser prüfbarer Eingriff |
-| D2 | Anzahl unterstützter Profile | **Zunächst genau zwei** | Weaver-Slots sind knapp (L4); mehr Profile verschärfen SR-3 und SR-8 überproportional |
+| D2 | Anzahl unterstützter Profile und Slot-Anzahl | **Genau zwei; `SLOT_COUNT` = maximale Profilanzahl, keine Reserve-Slots** | Weaver-Slots sind knapp (L4); die Entsperrdauer skaliert linear mit der Slot-Anzahl — gemessen rund 700 ms bei vier Slots mit den Konzeptparametern (F-5) |
 | D3 | Umgang mit Biometrie | **Im MLSU-Betrieb deaktivieren** | Biometrie erlaubt keine Auswahl durch Wissen; ein Fingerabdruck, der nur ein Profil öffnet, ist zudem selbst ein Indiz |
 | D4 | Kooperation oder eigener Fork | **Kooperation suchen** | Ein Eingriff in `LockSettingsService`/`keystore2` ohne bestehende Sicherheitskultur und Update-Pipeline ist nicht verantwortbar |
 | D5 | Kommunikation der Abstreitbarkeit | **Als „begrenzt, gegen A2/A3" bewerben, nie als unsichtbar** | Siehe Konzeptpapier 9.1 und 9.4 |
+| D6 | Implementierungssprache für P1 | **Sprache mit kontrollierbarem Speicher (Rust mit `zeroize` oder C)** | SR-2 ist in einer Sprache ohne Speicherkontrolle weder herstellbar noch prüfbar (F-2) |
 
 ---
 
@@ -273,6 +276,9 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 **An die Zielgruppe:**
 10. Ist die tägliche Pflege eines glaubwürdigen Zweitprofils realistisch leistbar?
 11. Was passiert im Ernstfall unter Stress — wird die richtige PIN erinnert?
+12. Fremdes PIN-Raten treibt auch den verborgenen Bereich in die Sperre (F-1). Was
+    soll am Schwellwert passieren — Sperre oder Löschung? Wie erklärt man das
+    Risiko jemandem, der das Gerät weitergibt oder aus der Hand geben muss?
 
 Frage 9 und 11 können das Projekt kippen. Sie gehören deshalb an den Anfang,
 nicht ans Ende.
@@ -309,6 +315,11 @@ sollte eingestellt oder grundlegend umgeschnitten werden, wenn:
 | 3 | D2 klären: Weaver-Slots realer Geräte zählen | Harte Obergrenze | offen |
 | 4 | Fragenkatalog an drei externe Reviewer versenden | ≥2 Rückläufer | offen |
 | 5 | Anforderungen nach Review überarbeiten, Version 1.0 festschreiben | Freigabe für P1 | offen |
+
+Erledigt seit Version 0.1: Modell der Auswahllogik gebaut und vermessen, fünf
+Befunde dokumentiert ([p0-befunde.md](p0-befunde.md)), Anforderungen entsprechend
+nachgezogen. Das ersetzt keinen der fünf Schritte oben — es hat die Liste nur um
+das ergänzt, was ohne Gerät und ohne Literaturzugang prüfbar war.
 
 **P0 ist abgeschlossen, wenn Schritt 5 erreicht ist — nicht früher.** Ein PoC vor
 Klärung von D1 baut mit hoher Wahrscheinlichkeit etwas, das es schon gibt.

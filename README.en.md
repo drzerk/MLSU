@@ -21,6 +21,11 @@
   the art as a comparison matrix, sharpened threat model with attack tree,
   requirements with acceptance criteria, decisions due before the prototype,
   and abort criteria
+- **[P0 — findings](docs/p0-befunde.md)** *(German)* — what the reference model
+  produced: five findings, including a conflict between two requirements
+- **[Reference implementation](reference/README.md)** *(German)* — a runnable
+  model of the selection logic with requirement tests and a timing rig. Not
+  Android code and not for use — a model built to be broken
 
 ---
 

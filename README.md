@@ -20,6 +20,11 @@
 - **[P0 — Anforderungsdokument](docs/p0-anforderungen.md)** — Stand der Technik als
   Vergleichsmatrix, verschärftes Bedrohungsmodell mit Angriffsbaum, Anforderungen
   mit Prüfkriterien, Entscheidungen vor dem Prototyp, Abbruchkriterien
+- **[P0 — Befunde](docs/p0-befunde.md)** — was die Referenzimplementierung ergeben
+  hat: fünf Befunde, darunter ein Zielkonflikt zwischen zwei Anforderungen
+- **[Referenzimplementierung](reference/README.md)** — lauffähiges Modell der
+  Auswahllogik mit Anforderungstests und Zeitmessrig. Kein Android-Code, nichts
+  zum Benutzen — ein Modell zum Kaputtmachen
 
 ---
 
