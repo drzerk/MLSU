@@ -26,6 +26,9 @@
 - **[Reference implementation](reference/README.md)** *(German)* — a runnable
   model of the selection logic with requirement tests and a timing rig. Not
   Android code and not for use — a model built to be broken
+- **[Proposal for ROM projects](docs/rom-proposal.en.md)** — the request for
+  feedback as maintainers would want to receive it: five questions first, then
+  the groundwork and the problems already found
 
 ---
 

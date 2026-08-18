@@ -25,6 +25,9 @@
 - **[Referenzimplementierung](reference/README.md)** — lauffähiges Modell der
   Auswahllogik mit Anforderungstests und Zeitmessrig. Kein Android-Code, nichts
   zum Benutzen — ein Modell zum Kaputtmachen
+- **[Proposal für ROM-Projekte](docs/rom-proposal.en.md)** *(englisch)* — der
+  Vorschlag in der Form, in der er bei Maintainern ankommt: fünf Fragen zuerst,
+  danach die Vorarbeit und die bereits gefundenen Probleme
 
 ---
 
