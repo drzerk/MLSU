@@ -129,9 +129,9 @@ submission.
 | | |
 |---|---|
 | Concept paper | [`README.en.md`](../README.en.md) |
-| Requirements, threat model, abort criteria | [`docs/p0-anforderungen.md`](p0-anforderungen.md) *(German)* |
-| Findings from the model | [`docs/p0-befunde.md`](p0-befunde.md) *(German)* |
+| Requirements, threat model, abort criteria | [`docs/p0-requirements.en.md`](p0-requirements.en.md) |
+| Findings from the model | [`docs/p0-findings.en.md`](p0-findings.en.md) |
 | Reference model, tests, timing rig | [`reference/`](../reference/) |
 
-The two German documents will be translated on request — say the word and they
-follow.
+Every document linked above is available in English; German versions exist
+alongside them in the repository.

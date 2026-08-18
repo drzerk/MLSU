@@ -3,6 +3,8 @@
 **Multi-Layer Secure Unlock (MLSU)** · Ergebnisse aus
 [`reference/`](../reference/README.md)
 
+*[🇬🇧 English](p0-findings.en.md) · 🇩🇪 Deutsch*
+
 | | |
 |---|---|
 | **Stand** | 2026-08-18 |

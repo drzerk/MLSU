@@ -17,15 +17,15 @@
 ## Documents
 
 - **Concept paper** — this document (sections 1–14)
-- **[P0 — requirements document](docs/p0-anforderungen.md)** *(German)* — state of
-  the art as a comparison matrix, sharpened threat model with attack tree,
-  requirements with acceptance criteria, decisions due before the prototype,
-  and abort criteria
-- **[P0 — findings](docs/p0-befunde.md)** *(German)* — what the reference model
+- **[P0 — requirements document](docs/p0-requirements.en.md)** — state of the art
+  as a comparison matrix, sharpened threat model with attack tree, requirements
+  with acceptance criteria, decisions due before the prototype, and abort
+  criteria
+- **[P0 — findings](docs/p0-findings.en.md)** — what the reference model
   produced: five findings, including a conflict between two requirements
-- **[Reference implementation](reference/README.md)** *(German)* — a runnable
-  model of the selection logic with requirement tests and a timing rig. Not
-  Android code and not for use — a model built to be broken
+- **[Reference implementation](reference/README.en.md)** — a runnable model of
+  the selection logic with requirement tests and a timing rig. Not Android code
+  and not for use — a model built to be broken
 - **[Proposal for ROM projects](docs/rom-proposal.en.md)** — the request for
   feedback as maintainers would want to receive it: five questions first, then
   the groundwork and the problems already found

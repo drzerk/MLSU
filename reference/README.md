@@ -8,6 +8,8 @@ Das ist kein Android-Code und nichts zum Benutzen. Es ist ein Modell zum
 Kaputtmachen — gebaut, damit falsche Annahmen in 400 Zeilen Python auffallen
 und nicht erst in einem Patch am Sperrbildschirm.
 
+*🇩🇪 Deutsch · [🇬🇧 English](README.en.md)*
+
 ---
 
 ## Ausführen

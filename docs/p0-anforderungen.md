@@ -2,6 +2,8 @@
 
 **Multi-Layer Secure Unlock (MLSU)** · Phase P0 des [Machbarkeitspfads](../README.md#11-machbarkeitspfad)
 
+*[🇬🇧 English](p0-requirements.en.md) · 🇩🇪 Deutsch*
+
 | | |
 |---|---|
 | **Status** | In Arbeit — Entwurf zur externen Review |
