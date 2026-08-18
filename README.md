@@ -2,13 +2,15 @@
 
 **Systemweiter Datenschutzmodus mit mehrstufigem Entsperrkonzept**
 
+*[🇬🇧 English](README.en.md) · 🇩🇪 Deutsch*
+
 | | |
 |---|---|
 | **Arbeitstitel** | Multi-Layer Secure Unlock (MLSU) |
 | **Status** | Konzeptpapier — kein Code, keine Implementierung |
 | **Version** | 0.1 (Entwurf) |
 | **Zielplattform** | Android / AOSP (primär), iOS (nur theoretisch) |
-| **Lizenzidee** | Offen und auditierbar (Apache-2.0 oder GPL-kompatibel) |
+| **Lizenzidee (späterer Code)** | Offen und auditierbar (Apache-2.0 oder GPL-kompatibel) |
 
 ---
 
@@ -408,3 +410,11 @@ Zwangssituationen einen realistischen — nicht einen versprochenen — Schutz
 gibt. Der Wert steht und fällt mit der Ehrlichkeit über die eigenen Grenzen:
 ein Feature, das seine Schwächen dokumentiert, ist für die Zielgruppe brauchbar.
 Eines, das sie verschweigt, ist gefährlich.
+
+---
+
+## Lizenz
+
+Dieses Dokument steht unter
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.de).
+Siehe [LICENSE](LICENSE).
