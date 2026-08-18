@@ -14,6 +14,16 @@
 
 ---
 
+## Documents
+
+- **Concept paper** — this document (sections 1–14)
+- **[P0 — requirements document](docs/p0-anforderungen.md)** *(German)* — state of
+  the art as a comparison matrix, sharpened threat model with attack tree,
+  requirements with acceptance criteria, decisions due before the prototype,
+  and abort criteria
+
+---
+
 ## 1. Summary
 
 MLSU describes an optional operating system feature in which **the PIN you enter
