@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, arena/**]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: reference/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run requirement, persistence and CLI tests
+        run: python -m unittest discover -s tests -v
+      - name: Smoke test — demo
+        run: python demo.py
+      - name: Smoke test — timing rig (non-blocking)
+        # The rig's exit code is 1 when it finds a timing signal. On a shared
+        # CI machine that is expected to be flaky and, per reference/README.md,
+        # a negative result is only a sanity check anyway — so this step
+        # reports whether the rig runs, not whether it found a signal.
+        run: python bench/timing.py --samples 10
+
+  ct-core:
+    name: C constant-time core
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reference/ct_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build, unit test and cross-check against Python reference
+        run: |
+          make check
+
+  lint:
+    name: Lint (pyflakes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pyflakes
+        run: pip install pyflakes
+      - name: Lint
+        run: python -m pyflakes mlsu/ tests/ demo.py bench/timing.py

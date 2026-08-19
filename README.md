@@ -22,6 +22,12 @@
   mit Prüfkriterien, Entscheidungen vor dem Prototyp, Abbruchkriterien
 - **[P0 — Befunde](docs/p0-befunde.md)** — was die Referenzimplementierung ergeben
   hat: fünf Befunde, darunter ein Zielkonflikt zwischen zwei Anforderungen
+- **[P1 — PoC-Skizze](docs/p1-poc-skizze.md)** — Änderungspunkte in AOSP als
+  Code-Gerüste: PIN-Routing in `LockSettingsService`, Private Space als Fundament,
+  Meilensteinplan M0–M4
+- **[P2 — Metadaten-Audit](docs/p2-metadaten-audit.md)** — Leck-Checkliste für den
+  PoC: jede Leckstelle (UI, Speicher, Verhalten, Dienste) mit Prüfmethode und
+  Prüfkriterium; abzuarbeiten in P1/M3
 - **[Referenzimplementierung](reference/README.md)** — lauffähiges Modell der
   Auswahllogik mit Anforderungstests und Zeitmessrig. Kein Android-Code, nichts
   zum Benutzen — ein Modell zum Kaputtmachen

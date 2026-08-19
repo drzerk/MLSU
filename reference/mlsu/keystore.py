@@ -15,13 +15,14 @@ profiles exist (SR-8, SR-9).
 """
 from dataclasses import dataclass
 import os
+import time
 
 from argon2.low_level import Type, hash_secret_raw
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from . import ct
-from .counters import WeaverModel
+from .counters import SlotCounter, WeaverModel
 from .params import (
     KDF_STRONG,
     NONCE_LEN,
@@ -59,6 +60,10 @@ class UnlockResult:
     profile_id: int | None
     profile_key: bytes | None
     locked_out: bool = False
+    #: Index of the slot that matched (None on miss/lockout). Not secret in
+    #: this model — the storage state byte already marks enrolled slots —
+    #: but kept out of __repr__ so logs never show it.
+    slot: int | None = None
 
     def __repr__(self) -> str:  # keep key material out of logs and tracebacks
         state = "locked out" if self.locked_out else ("hit" if self.found else "miss")
@@ -110,7 +115,7 @@ class KeyStore:
         self.slots[index] = Slot(salt=salt, nonce=nonce, blob=blob)
         return index
 
-    def unlock(self, pin: str) -> UnlockResult:
+    def unlock(self, pin: str, now: float | None = None) -> UnlockResult:
         """Try the PIN against every slot and return at most one profile.
 
         Invariants this method exists to enforce:
@@ -119,6 +124,9 @@ class KeyStore:
           return, no skipping of decoys (SR-3);
         * the selection between candidates is branch-free (SR-3);
         * a failed attempt is charged to the rate limiter (SR-4).
+
+        ``now`` is only for deterministic tests of the throttle; production
+        callers omit it and the wall clock is used.
         """
         if self.weaver.any_locked_out:
             return UnlockResult(False, None, None, locked_out=True)
@@ -142,8 +150,97 @@ class KeyStore:
             candidates.append((flag, payload))
 
         found, payload = ct.fold_select(candidates, PAYLOAD_LEN)
-        self.weaver.register_attempt(matched_slot)
+        self.weaver.register_attempt(matched_slot, now)
 
         if not found:
             return UnlockResult(False, None, None)
-        return UnlockResult(True, payload[0], payload[1:])
+        return UnlockResult(True, payload[0], payload[1:], slot=matched_slot)
+
+    def rate_limit_remaining(self, now: float | None = None) -> float:
+        """Seconds until the next unlock attempt is accepted, 0 if allowed.
+
+        A permanent lockout is reported as ``float("inf")``. The caller — in
+        this model the CLI — is expected to refuse attempts before deriving
+        anything, exactly as Weaver hardware would refuse them.
+
+        The delay is the worst case over all slots, because every slot carries
+        its own counter (SR-4) and a hidden profile is throttled too after
+        enough wrong guesses (finding F-1). A successful unlock only resets the
+        slot it matched; the others keep their throttle state.
+        """
+        if self.weaver.any_locked_out:
+            return float("inf")
+        now = time.time() if now is None else now
+        remaining = 0.0
+        for counter in self.weaver.counters:
+            if counter.delay > 0 and counter.last_failure_at is not None:
+                elapsed = now - counter.last_failure_at
+                if elapsed < counter.delay:
+                    remaining = max(remaining, counter.delay - elapsed)
+        return remaining
+
+    def change_pin(self, old_pin: str, new_pin: str, now: float | None = None) -> tuple[int, int] | None:
+        """Re-key the profile that opens with *old_pin* to *new_pin*.
+
+        Returns ``(slot_index, profile_id)`` on success, ``None`` if the old
+        PIN does not match or the store is locked out.
+
+        The profile key stays the **same**: re-keying the lock must not rotate
+        the encryption key, otherwise all data would need re-encryption. This
+        mirrors Android's synthetic password — the SP stays, only the
+        protector (PIN-derived) changes.
+
+        Side effect, consistent with SR-4/F-1: verifying the old PIN is an
+        unlock attempt, so the matched slot's counter resets and the other
+        slots' counters rise by one — exactly as a successful unlock would.
+        """
+        result = self.unlock(old_pin, now)
+        if not result.found or result.locked_out or result.slot is None:
+            return None
+        salt = os.urandom(SALT_LEN)
+        nonce = os.urandom(NONCE_LEN)
+        payload = bytes([result.profile_id]) + result.profile_key
+        pin_key = derive_pin_key(new_pin, salt, self.kdf)
+        blob = ChaCha20Poly1305(pin_key).encrypt(nonce, payload, None)
+        self.slots[result.slot] = Slot(salt=salt, nonce=nonce, blob=blob)
+        return result.slot, result.profile_id
+
+    def remove_profile(self, pin: str, now: float | None = None) -> tuple[int, int] | None:
+        """Delete the profile that opens with *pin*; the slot becomes a decoy.
+
+        Returns ``(slot_index, profile_id)`` on success, ``None`` otherwise.
+        The profile key is gone with the slot — there is no way back without
+        re-enrolling. The removed slot's counter is reset (it is a fresh
+        decoy); the other slots keep their counters, because verifying the
+        PIN was an unlock attempt charged to them (SR-4/F-1).
+        """
+        result = self.unlock(pin, now)
+        if not result.found or result.locked_out or result.slot is None:
+            return None
+        index = result.slot
+        self.slots[index] = Slot.decoy()
+        self._free_slots.append(index)
+        self.weaver.counters[index] = SlotCounter()
+        return index, result.profile_id
+
+    @classmethod
+    def restore(
+        cls,
+        kdf: KdfParams,
+        slots: list[Slot],
+        counters: list,
+        free_slots: list[int],
+    ) -> "KeyStore":
+        """Rebuild a key store from persisted state.
+
+        Used by ``mlsu.storage`` when a store file is loaded. The persisted
+        state must be validated by the caller; this method does not re-check
+        slot shapes or counter counts.
+        """
+        store = cls.__new__(cls)
+        store.kdf = kdf
+        store.slot_count = len(slots)
+        store.slots = slots
+        store.weaver = WeaverModel(slot_count=len(slots), counters=list(counters))
+        store._free_slots = list(free_slots)
+        return store

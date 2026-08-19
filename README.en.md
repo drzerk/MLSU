@@ -23,6 +23,12 @@
   criteria
 - **[P0 — findings](docs/p0-findings.en.md)** — what the reference model
   produced: five findings, including a conflict between two requirements
+- **[P1 — PoC sketch](docs/p1-poc-sketch.en.md)** — AOSP change points as code
+  skeletons: PIN routing in `LockSettingsService`, Private Space as foundation,
+  milestone plan M0–M4
+- **[P2 — Metadata audit](docs/p2-metadata-audit.en.md)** — leak checklist for
+  the PoC: every leak point (UI, storage, behaviour, services) with test method
+  and test criterion; to be worked through in P1/M3
 - **[Reference implementation](reference/README.en.md)** — a runnable model of
   the selection logic with requirement tests and a timing rig. Not Android code
   and not for use — a model built to be broken
