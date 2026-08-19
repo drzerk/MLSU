@@ -29,6 +29,8 @@ python3 -m mlsu --store demo.store enroll 471903 1    # enrol profile 1
 python3 -m mlsu --store demo.store enroll 220561 2    # enrol profile 2
 python3 -m mlsu --store demo.store unlock 471903      # check a PIN
 python3 -m mlsu --store demo.store status             # status (no profile count)
+
+make -C ct_core check                # C core: build, unit tests, cross-check against Python
 ```
 
 ## What is modelled
@@ -41,6 +43,7 @@ python3 -m mlsu --store demo.store status             # status (no profile count
 | `mlsu/ct.py` | Branch-free selection between candidates |
 | `mlsu/storage.py` | Persistent store file: fixed binary format, atomic writes, validation |
 | `mlsu/cli.py` | `mlsu-cli` — enrol, unlock, status; exit codes for scripts |
+| `ct_core/` | Constant-time core in C: branch-free selection as a specification for the AOSP path |
 | `tests/` | One test per requirement from [P0](../docs/p0-requirements.en.md) plus persistence and CLI tests |
 | `bench/timing.py` | Measurement rig for SR-3 and SR-9 |
 

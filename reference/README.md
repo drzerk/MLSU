@@ -29,6 +29,8 @@ python3 -m mlsu --store demo.store enroll 471903 1    # Profil 1 einrichten
 python3 -m mlsu --store demo.store enroll 220561 2    # Profil 2 einrichten
 python3 -m mlsu --store demo.store unlock 471903      # PIN prüfen
 python3 -m mlsu --store demo.store status             # Status (ohne Profilzahl)
+
+make -C ct_core check                # C-Kern: bauen, Unit-Tests, Crosscheck gegen Python
 ```
 
 ## Was modelliert wird
@@ -41,6 +43,7 @@ python3 -m mlsu --store demo.store status             # Status (ohne Profilzahl)
 | `mlsu/ct.py` | Zweigfreie Auswahl zwischen den Kandidaten |
 | `mlsu/storage.py` | Persistente Store-Datei: festes Binärformat, atomare Writes, Validierung |
 | `mlsu/cli.py` | `mlsu-cli` — Einrichten, Entsperren, Status; Exit-Codes für Skripte |
+| `ct_core/` | Konstantzeit-Kern in C: zweigfreie Auswahl als Spezifikation für den AOSP-Pfad |
 | `tests/` | Ein Test je Anforderung aus [P0](../docs/p0-anforderungen.md) plus Persistenz- und CLI-Tests |
 | `bench/timing.py` | Messrig für SR-3 und SR-9 |
 

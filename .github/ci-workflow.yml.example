@@ -36,6 +36,21 @@ jobs:
         # reports whether the rig runs, not whether it found a signal.
         run: python bench/timing.py --samples 10
 
+  ct-core:
+    name: C constant-time core
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reference/ct_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build, unit test and cross-check against Python reference
+        run: |
+          make check
+
   lint:
     name: Lint (pyflakes)
     runs-on: ubuntu-latest
