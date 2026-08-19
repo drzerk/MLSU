@@ -26,6 +26,10 @@
 - **[P1 — PoC sketch](docs/p1-poc-sketch.en.md)** — AOSP change points as code
   skeletons: PIN routing in `LockSettingsService`, Private Space as foundation,
   milestone plan M0–M4
+- **[P1 — Verification](docs/p1-verification.en.md)** — the U/O markers from
+  P0/P1 checked against AOSP source and public sources (as of 2026-08):
+  confirmations, a signature correction in the sketch skeleton, a new finding
+  (unified lock) and the state of the Weaver question
 - **[P2 — Metadata audit](docs/p2-metadata-audit.en.md)** — leak checklist for
   the PoC: every leak point (UI, storage, behaviour, services) with test method
   and test criterion; to be worked through in P1/M3

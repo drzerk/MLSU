@@ -25,6 +25,10 @@
 - **[P1 — PoC-Skizze](docs/p1-poc-skizze.md)** — Änderungspunkte in AOSP als
   Code-Gerüste: PIN-Routing in `LockSettingsService`, Private Space als Fundament,
   Meilensteinplan M0–M4
+- **[P1 — Verifikation](docs/p1-verifikation.md)** — die U/O-Markierungen aus
+  P0/P1 gegen den AOSP-Quellcode und öffentliche Quellen geprüft (Stand
+  2026-08): Bestätigungen, eine Signaturkorrektur im Skizzen-Gerüst, ein neuer
+  Befund (Unified Lock) und der Stand der Weaver-Frage
 - **[P2 — Metadaten-Audit](docs/p2-metadaten-audit.md)** — Leck-Checkliste für den
   PoC: jede Leckstelle (UI, Speicher, Verhalten, Dienste) mit Prüfmethode und
   Prüfkriterium; abzuarbeiten in P1/M3

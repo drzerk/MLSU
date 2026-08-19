@@ -7,8 +7,9 @@
 | | |
 |---|---|
 | **Status** | Sketch — code skeleton, not a patch, nothing to flash |
-| **Version** | 0.1 |
+| **Version** | 0.2 |
 | **Predecessors** | [P0 requirements](p0-requirements.en.md), [P0 findings](p0-findings.en.md), [concept paper](../README.en.md) |
+| **Supplement** | [P1 verification](p1-verification.en.md) — the U/O markers of this document checked against AOSP source (as of 2026-08-19); resulting corrections are incorporated |
 | **Goal** | A ROM project (GrapheneOS, CalyxOS, own AOSP fork) can adopt this roadmap directly |
 | **Basis** | AOSP `master` / Android 15+ (Private Space), as of 2026-08 |
 
@@ -56,6 +57,25 @@ core:**
 
 Everything else — two CE areas, separate locks, separate keystore namespaces,
 app separation, hidden-profile mechanics — already exists and is **inherited**.
+
+Two verification results support and sharpen this statement
+([p1-verification.en.md](p1-verification.en.md), as of 2026-08-19):
+
+- **AOSP already has a "one input, two profiles" path** (V): the *unified lock*.
+  `LockSettingsService` can unlock a profile with a credential derived from the
+  parent user's synthetic password (`getDecryptedPasswordForUnifiedProfile`,
+  "Unlock profile with unified lock"). It is built differently from MLSU —
+  derived instead of routed, all-or-nothing instead of exactly-one, profile
+  stays visible — but it confirms: the intervention is a routing and
+  invisibility problem, not a new cryptography problem. At the same time the
+  precaution from concept 9.5 applies twice: the unified-lock path must keep
+  working unchanged when MLSU is off, and the routing must not accidentally
+  fall into it (see 4.1).
+- **The Weaver HAL confirms the counter model** (V): slots form an array
+  `[0, getConfig().slots)`, throttling is **per slot**, a `write` makes the
+  previous slot content unrecoverable (`IWeaver.aidl`). The reference model
+  (`counters.py`) mirrors this semantics correctly; the slot count is a device
+  constant that M4 measures via `getConfig().slots` (see 8.2).
 
 The difference from Private Space remains the core of the concept:
 
@@ -114,7 +134,12 @@ profiles exist.
 **Current state (V):** `LockSettingsService.doVerifyCredential(...)` calls
 `SyntheticPasswordManager.unlockLskfBasedProtector()` for the given `userId`;
 on success `onCredentialVerified` → CE unlock of the user. So exactly **one**
-profile — the active one — is verified [5][6].
+profile — the active one — is verified [5][6][8]. Besides this there is the
+**unified-lock path** [8]: for profiles with a derived lock,
+`doVerifyCredential` first unlocks the parent ("Unlock parent by using parent's
+challenge") and then checks the profile with the derived credential ("Unlock
+profile with unified lock"). Both paths matter for MLSU: the first is replaced
+by the routing, the second must remain untouched (concept 9.5).
 
 **Target:** the input is checked against the protectors of **all linked MLSU
 profiles**. Structural constraints:
@@ -135,6 +160,11 @@ profiles**. Structural constraints:
 
 ```java
 // LockSettingsService — sketch of the MLSU routing (only the new path)
+// Signature and call convention verified against AOSP (p1-verification.en.md
+// V1/V2, as of 2026-08-19): unlockLskfBasedProtector(gatekeeper, protectorId,
+// credential, userId, challenge). The protector ID comes per user from
+// getCurrentLskfBasedProtectorId(userId); the remaining parameters (challenge,
+// calling user) are taken over by the real path from doVerifyCredential.
 public @NonNull VerifyCredentialResponse doVerifyCredentialForMlsu(
         @NonNull LockscreenCredential credential, int callingUserId) {
 
@@ -148,7 +178,8 @@ public @NonNull VerifyCredentialResponse doVerifyCredentialForMlsu(
     // SR-3: ALWAYS evaluate all profiles — no early return.
     for (int userId : mlsuUsers) {
         AuthenticationResult result = mSpManager.unlockLskfBasedProtector(
-                mGatekeeper, userId, credential, /* challenge */ 0L, callingUserId);
+                mGatekeeper, getCurrentLskfBasedProtectorId(userId), credential,
+                userId, /* challenge */ null);
         // NO break, NO early return: the loop always completes.
         if (result.syntheticPassword != null) {
             matchedUser = userId;
@@ -162,8 +193,9 @@ public @NonNull VerifyCredentialResponse doVerifyCredentialForMlsu(
     }
 
     // Unlock the CE of the matched profile — the other profile stays locked
-    // and its CE key does not exist in RAM (SR-2, as far as vold allows —
-    // to be verified, see 4.3).
+    // and its CE key is removed from the kernel keyring on lock (SR-2, kernel
+    // part verified: KeyUtil.evictKey → FS_IOC_REMOVE_ENCRYPTION_KEY;
+    // userspace copies remain an M4 measurement, see 4.3).
     mStorageManager.unlockUser(matchedUser, /* token */ null, matchedSp.deriveKeyStorePassword());
     // Internal profile switch: AMS makes matchedUser active; Keyguard does NOT change.
     return VerifyCredentialResponse.OK;
@@ -184,9 +216,13 @@ that slot on failure [5][7]. That is already "one slot per profile" (SR-4).
 
 **Target:** no structural change. Two checkpoints:
 
-- **Weaver slot count** (concept 12.2, P0 reading list L4): common secure
-  elements provide only a few slots. For two profiles it probably suffices; the
-  concrete number must be measured on the target device before P1 (U).
+- **Weaver slot count** (concept 12.2, P0 reading list L4): the number is a
+  device constant reported by the HAL — `IWeaver.getConfig().slots` (V); the SP
+  manager bounds slots via exactly this configuration (`weaverVerify`:
+  `slot >= mWeaverConfig.slots`, V). There is no public constant for Titan M/M2;
+  the number is measured on the target device in M4. Additionally to check: the
+  SP manager also occupies a Weaver slot for the **secdiscardable key** — two
+  profiles could need four slots, not two (V, p1-verification.en.md §4).
 - **Behaviour on lockout:** if one profile is permanently locked, checking the
   remaining profiles must continue unchanged — a permanent lockout must not
   change the *time* of the overall evaluation (SR-3). How `weaverVerify`
@@ -195,15 +231,23 @@ that slot on failure [5][7]. That is already "one slot per profile" (SR-4).
 ### 4.3 C3 — vold / StorageManager: CE of the chosen profile
 
 **Current state (V):** `StorageManager.unlockUser(userId, token, secret)` → vold
-`cryptfs unlock_user_key` loads the user's CE key; keys live under
-`/data/misc/vold/user_keys/ce/<userId>` [3][4]. `lock_user_key` removes it.
+loads the user's CE key; keys live under `/data/misc/vold/user_keys/ce/<userId>`
+[3][4]. The binder primitives are `unlockCeStorage(userId, secret)` →
+`fscrypt_unlock_ce_storage(...)` and `lockCeStorage(userId)` →
+`fscrypt_lock_ce_storage(...)` (V, `VoldNativeService.cpp`). The `vdc cryptfs`
+command name from [3] should be re-checked on the target build at M0. Key
+mechanics (V, `KeyUtil.cpp`): the CE key is placed into the kernel fscrypt
+keyring via `FS_IOC_ADD_ENCRYPTION_KEY` (ioctl buffer self-zeroing);
+`evictKey()` removes it via `FS_IOC_REMOVE_ENCRYPTION_KEY` and cleans up open
+files with backoff (3.2 s → 51.2 s).
 
 **Target:** MLSU calls `unlockUser` only for the matched user. On profile switch
-and on lock: `lock_user_key` for the *other* profile so its CE key does not
-remain in RAM (SR-2). **Open (U):** whether vold/kernel really keeps the CE key
-kernel-bound after `unlock_user_key`, and how fast `lock_user_key` removes it
-from memory — one of the most important P1 measurements, not representable in
-the Python model (F-2).
+and on lock: `lockCeStorage`/`evictKey` for the *other* profile so its CE key
+leaves the kernel keyring (SR-2). **Kernel part verified (V):** after `lock` the
+key no longer exists in the keyring. **The userspace part remains open (U):**
+transiently touched copies (vold `KeyBuffer`, keystore2 daemon, keymaster blobs)
+and their lifetime — one of the most important M4 measurements, not
+representable in the Python model (F-2).
 
 ### 4.4 C4 — SystemUI Keyguard: deliberately unchanged
 
@@ -308,22 +352,33 @@ Before M4 the feature is recommended to **nobody** (concept 11, P4 gate).
 
 ## 8. Risks and open questions (to resolve before M1)
 
+State of this list after the source check of 2026-08-19
+([p1-verification.en.md](p1-verification.en.md) §6); unchanged items are marked
+as such.
+
 1. **Constant time over binder/HAL** (concept 12.1): the loop in LSS is
    structurally constant, but binder round-trips to Gatekeeper/Weaver and the
    AEAD unwrap are not guaranteed to be. Honest assessment: SR-3 on real
    hardware remains an **open measurement question** (M2, methodology F-4).
+   *(unchanged, open)*
 2. **Weaver slot count** (concept 12.2): do common secure elements have enough
-   slots for 2+ profiles? (L4, M4)
+   slots for 2+ profiles? *(partially resolved)* The measurement path is
+   verified (`IWeaver.getConfig().slots`, V); the number itself remains an M4
+   measurement, including secdiscardable slot consumption (see 4.2).
 3. **CE key in RAM** (SR-2): does `lock_user_key` actually remove the key from
-   memory? (M4)
+   memory? *(partially resolved)* Kernel keyring removal established (V,
+   `KeyUtil.evictKey`); userspace copies remain an M4 measurement (see 4.3).
 4. **Single active user**: Android allows exactly one active user — this
    *helps* MLSU (the second area is never active at the same time), but
    requires a clean switch including media/notification restart (U).
+   *(unchanged)*
 5. **Biometrics** (concept 9.6): decide disable vs. one profile.
+   *(unchanged O; D3 recommendation "disable" still applies)*
 6. **OTA/reset/device change** (concept 12.6): what happens to the MLSU set?
+   *(unchanged O)*
 7. **Legal/UX**: the duress way-back and "plausible activity" (8.1) are design
    and legal questions, not code problems — test early with the target group
-   (P4 user study, concept 10).
+   (P4 user study, concept 10). *(unchanged O)*
 
 ---
 
@@ -336,6 +391,11 @@ Before M4 the feature is recommended to **nobody** (concept 11, P4 gate).
 5. [SyntheticPasswordManager.java — unlockLskfBasedProtector, weaverVerify, unwrapSyntheticPasswordBlob](https://android.googlesource.com/platform/frameworks/base/+/master/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java) (V)
 6. [LockSettingsService.java — doVerifyCredential / SP management](https://android.googlesource.com/platform/frameworks/base/+/master/services/core/java/com/android/server/locksettings/LockSettingsService.java) (V: structure; U: verify path details)
 7. [Analysis of the LSS verify flow (secondary)](https://medium.com/@salamsajid7/hunting-android-lockscreen-bypasses-on-pixel-a-campaign-walkthrough-8601f12f9963) (U: secondary source, cross-check in source)
+8. [LockSettingsService.java — line-level references: doVerifyCredential (2618–2620), onCredentialVerified (2691/2692/3379), unified lock (1678, 2769–2782), unlockLskfBasedProtector call sites (1230, 1247, 2460, 2668)](https://cs.android.com/android/platform/superproject/+/android-latest-release:frameworks/base/services/core/java/com/android/server/locksettings/LockSettingsService.java) (V, 2026-08-19)
+9. [SyntheticPasswordManager.java — line-level references: unlockLskfBasedProtector (1534), weaverVerify slot bound (793–794), secdiscardable slot (1776–1778)](https://cs.android.com/android/platform/superproject/+/android-latest-release:frameworks/base/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java) (V, 2026-08-19)
+10. [IWeaver.aidl — slot array, getConfig().slots, per-slot throttling](https://android.googlesource.com/platform/hardware/interfaces/+/refs/heads/main/weaver/aidl/android/hardware/weaver/IWeaver.aidl) (V, 2026-08-19)
+11. [KeyUtil.cpp — installKey/evictKey/waitForBusyFiles (fscrypt keyring)](https://android.googlesource.com/platform/system/vold/+/refs/heads/main/KeyUtil.cpp) and [VoldNativeService.cpp — unlockCeStorage/lockCeStorage](https://android.googlesource.com/platform/system/vold/+/refs/heads/main/VoldNativeService.cpp) (V, 2026-08-19)
+12. [P1 verification — full source list and classification](p1-verification.en.md) (V, 2026-08-19)
 
 ---
 
