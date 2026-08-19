@@ -300,6 +300,11 @@ value if omitted) · **MAY** (expansion stage).
 Questions 9 and 11 can sink the project. They therefore belong at the start,
 not at the end.
 
+Ready-to-send versions of questions 1–9 with channels, dispatch plan and
+response criteria are in the [review package](p0-review-package.en.md)
+(step 4). The target-audience questions 10–12 belong to the P4 user study and
+are deliberately absent there.
+
 ---
 
 ## 8. Abort criteria
@@ -330,7 +335,7 @@ discontinued or fundamentally rescoped if:
 | 1 | Work through reading list L1–L6, lift the comparison matrix from `U` to `V` | Evidenced matrix with references | **Partially done** (2026-08-19): L1/L2 literature worked through ([p1-verification.en.md](p1-verification.en.md) §5); L3/L4/L5 checked against AOSP source (§3, V1–V7); L6 from the GrapheneOS docs (V8); matrix rows Private Space, GrapheneOS, research now `V`. Device measurements (M4) and the remaining `U` rows stay unproven |
 | 2 | Settle D1: examine Private Space as a base | Decision with rationale | **Resolved** (2026-08-19): Private Space is the base — [p1-verification.en.md](p1-verification.en.md) V6/V7, [P1 sketch §2](p1-poc-sketch.en.md) |
 | 3 | Settle D2: count Weaver slots on real devices | Hard upper bound | **Partially resolved** (2026-08-19): measurement path via `IWeaver.getConfig().slots` verified; the number itself is device-specific and will be measured on the target device in M4 ([p1-verification.en.md](p1-verification.en.md) §4) |
-| 4 | Send the question catalogue to three external reviewers | ≥2 responses | open — no document replaces this; the verification provides the backed references for it |
+| 4 | Send the question catalogue to three external reviewers | ≥2 responses | open — ready-to-send drafts exist: [review package](p0-review-package.en.md) (R1–R4, as of 2026-08-19); dispatching is a project decision |
 | 5 | Revise the requirements after review, freeze version 1.0 | Release for P1 | open — only after feedback from step 4 |
 
 Done since version 0.1: the selection logic was modelled and measured, five

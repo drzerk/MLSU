@@ -29,6 +29,9 @@
   P0/P1 gegen den AOSP-Quellcode und öffentliche Quellen geprüft (Stand
   2026-08): Bestätigungen, eine Signaturkorrektur im Skizzen-Gerüst, ein neuer
   Befund (Unified Lock) und der Stand der Weaver-Frage
+- **[P0 — Reviewpaket](docs/p0-reviewpaket.md)** — versandfertige Anfragen an
+  externe Reviewer (GrapheneOS, CalyxOS, Forensik, Recht) für Schritt 4 des
+  Machbarkeitspfads; inkl. Versandplan, Checklisten und Rücklauf-Kriterien
 - **[P2 — Metadaten-Audit](docs/p2-metadaten-audit.md)** — Leck-Checkliste für den
   PoC: jede Leckstelle (UI, Speicher, Verhalten, Dienste) mit Prüfmethode und
   Prüfkriterium; abzuarbeiten in P1/M3

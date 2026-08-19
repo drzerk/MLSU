@@ -304,6 +304,11 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 Frage 9 und 11 können das Projekt kippen. Sie gehören deshalb an den Anfang,
 nicht ans Ende.
 
+Versandfertige Fassungen der Fragen 1–9 mit Kanalangaben, Versandplan und
+Rücklauf-Kriterien liegen im [Reviewpaket](p0-reviewpaket.md) vor (Schritt 4).
+Die Zielgruppenfragen 10–12 gehören in die P4-Nutzerstudie und sind dort
+bewusst nicht enthalten.
+
 ---
 
 ## 8. Abbruchkriterien
@@ -334,7 +339,7 @@ sollte eingestellt oder grundlegend umgeschnitten werden, wenn:
 | 1 | Leseliste L1–L6 abarbeiten, Vergleichsmatrix von `U` auf `V` heben | Belegte Matrix mit Fundstellen | **Teilweise erledigt** (2026-08-19): L1/L2 Literatur durchgearbeitet ([p1-verifikation.md](p1-verifikation.md) §5); L3/L4/L5 gegen AOSP-Quellcode geprüft (§3, V1–V7); L6 aus der GrapheneOS-Doku (V8); Matrixzeilen Private Space, GrapheneOS, Forschung jetzt `V`. Nicht belegt bleiben Geräte-Messungen (M4) und die restlichen `U`-Zeilen |
 | 2 | D1 klären: Private Space als Basis prüfen | Entscheidung mit Begründung | **Geklärt** (2026-08-19): Private Space ist die Basis — [p1-verifikation.md](p1-verifikation.md) V6/V7, [P1-Skizze §2](p1-poc-skizze.md) |
 | 3 | D2 klären: Weaver-Slots realer Geräte zählen | Harte Obergrenze | **Teilweise geklärt** (2026-08-19): Messweg über `IWeaver.getConfig().slots` verifiziert; die Zahl selbst ist gerätespezifisch und wird in M4 am Zielgerät gemessen ([p1-verifikation.md](p1-verifikation.md) §4) |
-| 4 | Fragenkatalog an drei externe Reviewer versenden | ≥2 Rückläufer | offen — ersetzt kein Dokument; die Verifikation liefert dafür die belegten Fundstellen |
+| 4 | Fragenkatalog an drei externe Reviewer versenden | ≥2 Rückläufer | offen — versandfertige Entwürfe liegen vor: [Reviewpaket](p0-reviewpaket.md) (R1–R4, Stand 2026-08-19); Versand ist Projektentscheidung |
 | 5 | Anforderungen nach Review überarbeiten, Version 1.0 festschreiben | Freigabe für P1 | offen — erst nach Rückläufen aus Schritt 4 |
 
 Erledigt seit Version 0.1: Modell der Auswahllogik gebaut und vermessen, fünf

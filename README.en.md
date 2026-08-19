@@ -30,6 +30,10 @@
   P0/P1 checked against AOSP source and public sources (as of 2026-08):
   confirmations, a signature correction in the sketch skeleton, a new finding
   (unified lock) and the state of the Weaver question
+- **[P0 — Review package](docs/p0-review-package.en.md)** — ready-to-send
+  requests to external reviewers (GrapheneOS, CalyxOS, forensics, legal) for
+  step 4 of the feasibility path; incl. dispatch plan, checklists and response
+  criteria
 - **[P2 — Metadata audit](docs/p2-metadata-audit.en.md)** — leak checklist for
   the PoC: every leak point (UI, storage, behaviour, services) with test method
   and test criterion; to be worked through in P1/M3
