@@ -15,6 +15,7 @@ profiles exist (SR-8, SR-9).
 """
 from dataclasses import dataclass
 import os
+import time
 
 from argon2.low_level import Type, hash_secret_raw
 from cryptography.exceptions import InvalidTag
@@ -110,7 +111,7 @@ class KeyStore:
         self.slots[index] = Slot(salt=salt, nonce=nonce, blob=blob)
         return index
 
-    def unlock(self, pin: str) -> UnlockResult:
+    def unlock(self, pin: str, now: float | None = None) -> UnlockResult:
         """Try the PIN against every slot and return at most one profile.
 
         Invariants this method exists to enforce:
@@ -119,6 +120,9 @@ class KeyStore:
           return, no skipping of decoys (SR-3);
         * the selection between candidates is branch-free (SR-3);
         * a failed attempt is charged to the rate limiter (SR-4).
+
+        ``now`` is only for deterministic tests of the throttle; production
+        callers omit it and the wall clock is used.
         """
         if self.weaver.any_locked_out:
             return UnlockResult(False, None, None, locked_out=True)
@@ -142,8 +146,53 @@ class KeyStore:
             candidates.append((flag, payload))
 
         found, payload = ct.fold_select(candidates, PAYLOAD_LEN)
-        self.weaver.register_attempt(matched_slot)
+        self.weaver.register_attempt(matched_slot, now)
 
         if not found:
             return UnlockResult(False, None, None)
         return UnlockResult(True, payload[0], payload[1:])
+
+    def rate_limit_remaining(self, now: float | None = None) -> float:
+        """Seconds until the next unlock attempt is accepted, 0 if allowed.
+
+        A permanent lockout is reported as ``float("inf")``. The caller — in
+        this model the CLI — is expected to refuse attempts before deriving
+        anything, exactly as Weaver hardware would refuse them.
+
+        The delay is the worst case over all slots, because every slot carries
+        its own counter (SR-4) and a hidden profile is throttled too after
+        enough wrong guesses (finding F-1). A successful unlock only resets the
+        slot it matched; the others keep their throttle state.
+        """
+        if self.weaver.any_locked_out:
+            return float("inf")
+        now = time.time() if now is None else now
+        remaining = 0.0
+        for counter in self.weaver.counters:
+            if counter.delay > 0 and counter.last_failure_at is not None:
+                elapsed = now - counter.last_failure_at
+                if elapsed < counter.delay:
+                    remaining = max(remaining, counter.delay - elapsed)
+        return remaining
+
+    @classmethod
+    def restore(
+        cls,
+        kdf: KdfParams,
+        slots: list[Slot],
+        counters: list,
+        free_slots: list[int],
+    ) -> "KeyStore":
+        """Rebuild a key store from persisted state.
+
+        Used by ``mlsu.storage`` when a store file is loaded. The persisted
+        state must be validated by the caller; this method does not re-check
+        slot shapes or counter counts.
+        """
+        store = cls.__new__(cls)
+        store.kdf = kdf
+        store.slot_count = len(slots)
+        store.slots = slots
+        store.weaver = WeaverModel(slot_count=len(slots), counters=list(counters))
+        store._free_slots = list(free_slots)
+        return store
