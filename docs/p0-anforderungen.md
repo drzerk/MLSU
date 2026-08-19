@@ -7,11 +7,11 @@
 | | |
 |---|---|
 | **Status** | In Arbeit — Entwurf zur externen Review |
-| **Version** | 0.1 |
+| **Version** | 0.2 |
 | **Vorgänger** | [Konzeptpapier v0.1](../README.md) |
 | **Ziel dieser Phase** | Belastbares Anforderungsdokument als Grundlage für den PoC (P1) |
 | **Abschlusskriterium** | Alle Anforderungen haben ein Prüfkriterium; alle `U`-Einträge sind geklärt; mindestens zwei externe Reviews liegen vor |
-| **Bisherige Ergebnisse** | [Befunde aus der Referenzimplementierung](p0-befunde.md) — F-1 bis F-5, in dieses Dokument eingearbeitet |
+| **Bisherige Ergebnisse** | [Befunde aus der Referenzimplementierung](p0-befunde.md) — F-1 bis F-5, in dieses Dokument eingearbeitet; [P1-Verifikation](p1-verifikation.md) — schriftlich prüfbare U-Einträge gegen AOSP-Quellcode und öffentliche Quellen belegt (Stand 2026-08-19) |
 
 ---
 
@@ -71,19 +71,29 @@ schnell. Jede `V`-Aussage bekommt ein Prüfdatum und die konkrete Version
 |---|---|---|---|---|---|---|---|---|
 | AOSP Multi-User | ja | nein | nein | ja | teilw. | ja | teilw. | U |
 | Android Work Profile | ja | nein | nein | ja | ja | ja | ja | U |
-| Android Private Space (ab 15) | ja | nein | teilw. | ja | ja | ja | ja | U |
+| Android Private Space (ab 15) | ja | nein | teilw. | ja | ja | ja | ja | V |
 | Samsung Secure Folder (Knox) | ja | nein | nein | ja | ja | **nein** | ja | U |
-| GrapheneOS Duress-PIN | — | ja | ja | **nein** | — | ja | nein | U |
+| GrapheneOS Duress-PIN | — | ja | ja | **nein** | — | ja | nein | V |
 | VeraCrypt Hidden Volume (Desktop) | ja | ja | ja | ja | n/a | ja | n/a | U |
 | VeraCrypt Hidden OS (Desktop) | ja | ja | ja | ja | teilw. | ja | n/a | U |
 | LUKS + detached header | ja | nein | ja | ja | n/a | ja | n/a | U |
-| Mobiflage / MobiPluto / MobiCeal (Forschung) | ja | ja | ja | ja | O | ja | nein | U |
+| Mobiflage / MobiPluto / MobiCeal / DEFTL (Forschung) | ja | ja | ja | ja | O | ja | nein | V |
 | Qubes OS (Desktop-Kompartimentierung) | ja | nein | nein | ja | ja | ja | n/a | U |
 | **MLSU (Zielbild)** | **ja** | **ja** | **ja** | **ja** | **ja** | **ja** | **nein** | — |
 
+Die `V`-Einträge sind mit Fundstellen belegt in
+[p1-verifikation.md](p1-verifikation.md) (Stand 2026-08-19): Private Space über
+die öffentliche API (Usertyp `PRIVATE`, `DISALLOW_ADD_PRIVATE_PROFILE`) und die
+P1-Skizze §2; GrapheneOS Duress über die Projektdokumentation (irreversibles
+Wipe inkl. Weaver-Tabelle, K4 = nein); die Forschungsreihe über die
+Originalarbeiten inkl. der dort dokumentierten Grenzen (FTL/multi-snapshot).
+Die übrigen `U`-Einträge bleiben bis zur jeweiligen Quellenprüfung `U` — eine
+Vergleichsmatrix, die ungeprüfte Zeilen als geprüft ausgibt, wäre schlimmer als
+eine lückenhafte.
+
 ### 3.3 Was daraus folgt
 
-Drei Beobachtungen, die den Zuschnitt des Projekts bestimmen:
+Vier Beobachtungen, die den Zuschnitt des Projekts bestimmen:
 
 1. **K2 ist das Alleinstellungsmerkmal.** Alle Mainline-Android-Lösungen trennen
    Bereiche, aber keine wählt den Bereich über das Entsperrgeheimnis. Wer MLSU
@@ -94,10 +104,19 @@ Drei Beobachtungen, die den Zuschnitt des Projekts bestimmen:
    nicht in Produktionssystemen angekommen. **Die wichtigste P0-Frage lautet:
    warum nicht?** Wenn die Antwort technisch ist (Flash-Metadaten, FTL, Wear
    Leveling), gilt sie auch für MLSU. Diese Literatur zu lesen ist billiger als
-   ihre Ergebnisse nachzubauen.
+   ihre Ergebnisse nachzubauen. *(2026-08-19 ergänzt: gelesen und eingeordnet —
+   [p1-verifikation.md](p1-verifikation.md) §5. Die Vorgänger scheiterten am
+   Speicherschicht-Eingriff, nicht am Credential-Konzept; AB-1 ist für A4 nicht
+   ausgelöst.)*
 3. **K7 ist verloren.** Ohne Custom-ROM ist der Mechanismus nicht baubar. Das
    halbiert die realistische Nutzerbasis und macht Kooperation mit einem
    bestehenden ROM-Projekt praktisch alternativlos.
+4. **„Eine Eingabe, zwei Profile" existiert im Ansatz bereits.** AOSP entsperrt
+   mit dem *Unified Lock* ein Profil über ein vom Eltern-User abgeleitetes
+   Credential (V, `LockSettingsService`). Das ist alles-oder-nichts, nicht
+   geroutet, und das Profil bleibt sichtbar — aber es bestätigt, dass MLSU im
+   Kern ein Routing- und Unsichtbarkeitsproblem ist, kein neues
+   Kryptografieproblem ([p1-verifikation.md](p1-verifikation.md) V7).
 
 ### 3.4 Zu prüfende Vorarbeiten (P0-Leseliste)
 
@@ -243,8 +262,8 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 
 | # | Entscheidung | Empfehlung | Begründung |
 |---|---|---|---|
-| D1 | Eigenständiger Mechanismus oder Aufsatz auf Private Space | **Zuerst Private Space prüfen** | Wenn K1/K3/K5 dort bereits erfüllt sind, reduziert sich MLSU auf den PIN-Auswahlpfad — deutlich kleinerer, besser prüfbarer Eingriff |
-| D2 | Anzahl unterstützter Profile und Slot-Anzahl | **Genau zwei; `SLOT_COUNT` = maximale Profilanzahl, keine Reserve-Slots** | Weaver-Slots sind knapp (L4); die Entsperrdauer skaliert linear mit der Slot-Anzahl — gemessen rund 700 ms bei vier Slots mit den Konzeptparametern (F-5) |
+| D1 | Eigenständiger Mechanismus oder Aufsatz auf Private Space | **Geklärt (2026-08-19): Private Space ist die Basis** | K1/K3/K5 sind dort weitgehend erfüllt; MLSU reduziert sich auf den PIN-Auswahlpfad plus Unsichtbarkeit — belegt in der [P1-Skizze §2](p1-poc-skizze.md) und der [P1-Verifikation](p1-verifikation.md) (V6/V7, inkl. Unified Lock) |
+| D2 | Anzahl unterstützter Profile und Slot-Anzahl | **Genau zwei; `SLOT_COUNT` = maximale Profilanzahl, keine Reserve-Slots** | Weaver-Slots sind knapp (L4); die Entsperrdauer skaliert linear mit der Slot-Anzahl — gemessen rund 700 ms bei vier Slots mit den Konzeptparametern (F-5). Messweg verifiziert: `IWeaver.getConfig().slots` am Zielgerät (M4), inkl. secdiscardable-Slot-Verbrauch ([p1-verifikation.md](p1-verifikation.md) §4) |
 | D3 | Umgang mit Biometrie | **Im MLSU-Betrieb deaktivieren** | Biometrie erlaubt keine Auswahl durch Wissen; ein Fingerabdruck, der nur ein Profil öffnet, ist zudem selbst ein Indiz |
 | D4 | Kooperation oder eigener Fork | **Kooperation suchen** | Ein Eingriff in `LockSettingsService`/`keystore2` ohne bestehende Sicherheitskultur und Update-Pipeline ist nicht verantwortbar |
 | D5 | Kommunikation der Abstreitbarkeit | **Als „begrenzt, gegen A2/A3" bewerben, nie als unsichtbar** | Siehe Konzeptpapier 9.1 und 9.4 |
@@ -285,6 +304,11 @@ Wertverlust bei Verzicht) · **KANN** (Ausbaustufe).
 Frage 9 und 11 können das Projekt kippen. Sie gehören deshalb an den Anfang,
 nicht ans Ende.
 
+Versandfertige Fassungen der Fragen 1–9 mit Kanalangaben, Versandplan und
+Rücklauf-Kriterien liegen im [Reviewpaket](p0-reviewpaket.md) vor (Schritt 4).
+Die Zielgruppenfragen 10–12 gehören in die P4-Nutzerstudie und sind dort
+bewusst nicht enthalten.
+
 ---
 
 ## 8. Abbruchkriterien
@@ -312,11 +336,11 @@ sollte eingestellt oder grundlegend umgeschnitten werden, wenn:
 
 | # | Schritt | Ergebnis | Status |
 |---|---|---|---|
-| 1 | Leseliste L1–L6 abarbeiten, Vergleichsmatrix von `U` auf `V` heben | Belegte Matrix mit Fundstellen | offen |
-| 2 | D1 klären: Private Space als Basis prüfen | Entscheidung mit Begründung | offen |
-| 3 | D2 klären: Weaver-Slots realer Geräte zählen | Harte Obergrenze | offen |
-| 4 | Fragenkatalog an drei externe Reviewer versenden | ≥2 Rückläufer | offen |
-| 5 | Anforderungen nach Review überarbeiten, Version 1.0 festschreiben | Freigabe für P1 | offen |
+| 1 | Leseliste L1–L6 abarbeiten, Vergleichsmatrix von `U` auf `V` heben | Belegte Matrix mit Fundstellen | **Teilweise erledigt** (2026-08-19): L1/L2 Literatur durchgearbeitet ([p1-verifikation.md](p1-verifikation.md) §5); L3/L4/L5 gegen AOSP-Quellcode geprüft (§3, V1–V7); L6 aus der GrapheneOS-Doku (V8); Matrixzeilen Private Space, GrapheneOS, Forschung jetzt `V`. Nicht belegt bleiben Geräte-Messungen (M4) und die restlichen `U`-Zeilen |
+| 2 | D1 klären: Private Space als Basis prüfen | Entscheidung mit Begründung | **Geklärt** (2026-08-19): Private Space ist die Basis — [p1-verifikation.md](p1-verifikation.md) V6/V7, [P1-Skizze §2](p1-poc-skizze.md) |
+| 3 | D2 klären: Weaver-Slots realer Geräte zählen | Harte Obergrenze | **Teilweise geklärt** (2026-08-19): Messweg über `IWeaver.getConfig().slots` verifiziert; die Zahl selbst ist gerätespezifisch und wird in M4 am Zielgerät gemessen ([p1-verifikation.md](p1-verifikation.md) §4) |
+| 4 | Fragenkatalog an drei externe Reviewer versenden | ≥2 Rückläufer | offen — versandfertige Entwürfe liegen vor: [Reviewpaket](p0-reviewpaket.md) (R1–R4, Stand 2026-08-19); Versand ist Projektentscheidung |
+| 5 | Anforderungen nach Review überarbeiten, Version 1.0 festschreiben | Freigabe für P1 | offen — erst nach Rückläufen aus Schritt 4 |
 
 Erledigt seit Version 0.1: Modell der Auswahllogik gebaut und vermessen, fünf
 Befunde dokumentiert ([p0-befunde.md](p0-befunde.md)), Anforderungen entsprechend

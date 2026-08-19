@@ -7,11 +7,11 @@
 | | |
 |---|---|
 | **Status** | In progress — draft for external review |
-| **Version** | 0.1 |
+| **Version** | 0.2 |
 | **Predecessor** | [Concept paper v0.1](../README.en.md) |
 | **Goal of this phase** | A defensible requirements document as the basis for the PoC (P1) |
 | **Completion criterion** | Every requirement has an acceptance criterion; every `U` entry is resolved; at least two external reviews are in |
-| **Results so far** | [Findings from the reference implementation](p0-findings.en.md) — F-1 to F-5, incorporated into this document |
+| **Results so far** | [Findings from the reference implementation](p0-findings.en.md) — F-1 to F-5, incorporated into this document; [P1 verification](p1-verification.en.md) — the checkable-in-writing `U` entries backed against AOSP source and public sources (as of 2026-08-19) |
 
 ---
 
@@ -69,19 +69,28 @@ release, device, ROM build) it refers to.
 |---|---|---|---|---|---|---|---|---|
 | AOSP multi-user | yes | no | no | yes | partly | yes | partly | U |
 | Android work profile | yes | no | no | yes | yes | yes | yes | U |
-| Android Private Space (15+) | yes | no | partly | yes | yes | yes | yes | U |
+| Android Private Space (15+) | yes | no | partly | yes | yes | yes | yes | V |
 | Samsung Secure Folder (Knox) | yes | no | no | yes | yes | **no** | yes | U |
-| GrapheneOS duress PIN | — | yes | yes | **no** | — | yes | no | U |
+| GrapheneOS duress PIN | — | yes | yes | **no** | — | yes | no | V |
 | VeraCrypt hidden volume (desktop) | yes | yes | yes | yes | n/a | yes | n/a | U |
 | VeraCrypt hidden OS (desktop) | yes | yes | yes | yes | partly | yes | n/a | U |
 | LUKS + detached header | yes | no | yes | yes | n/a | yes | n/a | U |
-| Mobiflage / MobiPluto / MobiCeal (research) | yes | yes | yes | yes | O | yes | no | U |
+| Mobiflage / MobiPluto / MobiCeal / DEFTL (research) | yes | yes | yes | yes | O | yes | no | V |
 | Qubes OS (desktop compartmentalization) | yes | no | no | yes | yes | yes | n/a | U |
 | **MLSU (target)** | **yes** | **yes** | **yes** | **yes** | **yes** | **yes** | **no** | — |
 
+The `V` entries are backed with references in
+[p1-verification.en.md](p1-verification.en.md) (as of 2026-08-19): Private Space
+via the public API (user type `PRIVATE`, `DISALLOW_ADD_PRIVATE_PROFILE`) and P1
+sketch §2; GrapheneOS duress via the project documentation (irreversible wipe
+including the Weaver table, K4 = no); the research line via the original papers
+including their documented limits (FTL/multi-snapshot). The remaining `U`
+entries stay `U` until individually checked — a comparison matrix that presents
+unchecked rows as checked would be worse than an incomplete one.
+
 ### 3.3 What follows from this
 
-Three observations that determine the shape of the project:
+Four observations that determine the shape of the project:
 
 1. **K2 is the distinguishing feature.** Every mainline Android solution
    separates areas, but none selects the area through the unlock secret.
@@ -92,9 +101,18 @@ Three observations that determine the shape of the project:
    production systems. **The most important P0 question is: why not?** If the
    answer is technical (flash metadata, FTL, wear leveling), it applies to MLSU
    too. Reading that literature is cheaper than reproducing its results.
+   *(Added 2026-08-19: read and classified — [p1-verification.en.md](p1-verification.en.md)
+   §5. The predecessors failed at the storage-layer intervention, not at the
+   credential concept; AB-1 is not triggered for A4.)*
 3. **K7 is lost.** Without a custom ROM the mechanism cannot be built. That
    halves the realistic user base and makes cooperation with an existing ROM
    project effectively the only option.
+4. **"One input, two profiles" already exists in rudimentary form.** Via the
+   *unified lock*, AOSP unlocks a profile with a credential derived from the
+   parent user (V, `LockSettingsService`). It is all-or-nothing, not routed, and
+   the profile stays visible — but it confirms that MLSU is at its core a
+   routing and invisibility problem, not a new cryptography problem
+   ([p1-verification.en.md](p1-verification.en.md) V7).
 
 ### 3.4 Prior work to review (P0 reading list)
 
@@ -240,8 +258,8 @@ value if omitted) · **MAY** (expansion stage).
 
 | # | Decision | Recommendation | Rationale |
 |---|---|---|---|
-| D1 | Standalone mechanism or built on Private Space | **Examine Private Space first** | If K1/K3/K5 are already satisfied there, MLSU reduces to the PIN selection path — a much smaller and more reviewable change |
-| D2 | Number of supported profiles and slot count | **Exactly two; `SLOT_COUNT` = maximum profile count, no spare slots** | Weaver slots are scarce (L4); unlock latency scales linearly with slot count — measured at about 700 ms for four slots with the concept parameters (F-5) |
+| D1 | Standalone mechanism or built on Private Space | **Resolved (2026-08-19): Private Space is the base** | K1/K3/K5 are largely satisfied there; MLSU reduces to the PIN selection path plus invisibility — backed in the [P1 sketch §2](p1-poc-sketch.en.md) and the [P1 verification](p1-verification.en.md) (V6/V7, incl. unified lock) |
+| D2 | Number of supported profiles and slot count | **Exactly two; `SLOT_COUNT` = maximum profile count, no spare slots** | Weaver slots are scarce (L4); unlock latency scales linearly with slot count — measured at about 700 ms for four slots with the concept parameters (F-5). Measurement path verified: `IWeaver.getConfig().slots` on the target device (M4), incl. secdiscardable slot consumption ([p1-verification.en.md](p1-verification.en.md) §4) |
 | D3 | Handling of biometrics | **Disable in MLSU operation** | Biometrics permit no selection through knowledge; a fingerprint that opens only one profile is itself an indicator |
 | D4 | Cooperation or own fork | **Seek cooperation** | Changing `LockSettingsService`/`keystore2` without an existing security culture and update pipeline is not defensible |
 | D5 | How deniability is communicated | **Advertise as "limited, against A2/A3", never as invisible** | See concept paper 9.1 and 9.4 |
@@ -282,6 +300,11 @@ value if omitted) · **MAY** (expansion stage).
 Questions 9 and 11 can sink the project. They therefore belong at the start,
 not at the end.
 
+Ready-to-send versions of questions 1–9 with channels, dispatch plan and
+response criteria are in the [review package](p0-review-package.en.md)
+(step 4). The target-audience questions 10–12 belong to the P4 user study and
+are deliberately absent there.
+
 ---
 
 ## 8. Abort criteria
@@ -309,17 +332,19 @@ discontinued or fundamentally rescoped if:
 
 | # | Step | Result | Status |
 |---|---|---|---|
-| 1 | Work through reading list L1–L6, lift the comparison matrix from `U` to `V` | Evidenced matrix with references | open |
-| 2 | Settle D1: examine Private Space as a base | Decision with rationale | open |
-| 3 | Settle D2: count Weaver slots on real devices | Hard upper bound | open |
-| 4 | Send the question catalogue to three external reviewers | ≥2 responses | open |
-| 5 | Revise the requirements after review, freeze version 1.0 | Release for P1 | open |
+| 1 | Work through reading list L1–L6, lift the comparison matrix from `U` to `V` | Evidenced matrix with references | **Partially done** (2026-08-19): L1/L2 literature worked through ([p1-verification.en.md](p1-verification.en.md) §5); L3/L4/L5 checked against AOSP source (§3, V1–V7); L6 from the GrapheneOS docs (V8); matrix rows Private Space, GrapheneOS, research now `V`. Device measurements (M4) and the remaining `U` rows stay unproven |
+| 2 | Settle D1: examine Private Space as a base | Decision with rationale | **Resolved** (2026-08-19): Private Space is the base — [p1-verification.en.md](p1-verification.en.md) V6/V7, [P1 sketch §2](p1-poc-sketch.en.md) |
+| 3 | Settle D2: count Weaver slots on real devices | Hard upper bound | **Partially resolved** (2026-08-19): measurement path via `IWeaver.getConfig().slots` verified; the number itself is device-specific and will be measured on the target device in M4 ([p1-verification.en.md](p1-verification.en.md) §4) |
+| 4 | Send the question catalogue to three external reviewers | ≥2 responses | open — ready-to-send drafts exist: [review package](p0-review-package.en.md) (R1–R4, as of 2026-08-19); dispatching is a project decision |
+| 5 | Revise the requirements after review, freeze version 1.0 | Release for P1 | open — only after feedback from step 4 |
 
 Done since version 0.1: the selection logic was modelled and measured, five
 findings documented ([p0-findings.en.md](p0-findings.en.md)), and the
 requirements adjusted accordingly. That replaces none of the five steps above —
 it only added what was checkable without a device and without access to the
-literature.
+literature. Since version 0.2 the same applies to the platform assumptions:
+checked against AOSP source and public sources in
+[p1-verification.en.md](p1-verification.en.md); steps 4 and 5 remain open.
 
 **P0 is complete when step 5 is reached, not earlier.** A PoC built before D1 is
 settled will most likely build something that already exists.
