@@ -218,6 +218,109 @@ class TestUnlock(unittest.TestCase):
             self.assertEqual(before, after)  # no counters charged, no rewrite
 
 
+class TestChangePinCli(unittest.TestCase):
+    def test_change_pin_via_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, out = cli(path, "change-pin", "471903", "123456")
+            self.assertEqual(code, EXIT_OK)
+            self.assertIn("geändert", out)
+            code, _ = cli(path, "unlock", "123456")
+            self.assertEqual(code, EXIT_OK)
+            code, _ = cli(path, "unlock", "471903")
+            self.assertEqual(code, EXIT_WRONG_PIN)
+
+    def test_change_pin_wrong_old_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, _ = cli(path, "change-pin", "999999", "123456")
+            self.assertEqual(code, EXIT_WRONG_PIN)
+
+    def test_change_pin_rejects_short_new_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, _ = cli(path, "change-pin", "471903", "12")
+            self.assertEqual(code, EXIT_USAGE)
+
+    def test_change_pin_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            cli(path, "change-pin", "471903", "123456")
+            store = load_store(path)
+            self.assertEqual(store.unlock("123456").profile_id, 1)
+
+    def test_change_pin_throttled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            for _ in range(5):
+                cli(path, "unlock", "000000")
+            code, _ = cli(path, "change-pin", "471903", "123456")
+            self.assertEqual(code, EXIT_THROTTLED)
+
+
+class TestRemoveCli(unittest.TestCase):
+    def test_remove_via_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, out = cli(path, "remove", "471903")
+            self.assertEqual(code, EXIT_OK)
+            self.assertIn("gelöscht", out)
+            code, _ = cli(path, "unlock", "471903")
+            self.assertEqual(code, EXIT_WRONG_PIN)
+            # freed slot can take a new profile
+            code, _ = cli(path, "enroll", "333333", "3")
+            self.assertEqual(code, EXIT_OK)
+
+    def test_remove_wrong_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, _ = cli(path, "remove", "999999")
+            self.assertEqual(code, EXIT_WRONG_PIN)
+            code, _ = cli(path, "unlock", "471903")
+            self.assertEqual(code, EXIT_OK, "profile must be untouched")
+
+    def test_remove_throttled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            for _ in range(5):
+                cli(path, "unlock", "000000")
+            code, _ = cli(path, "remove", "471903")
+            self.assertEqual(code, EXIT_THROTTLED)
+
+
+class TestLockCli(unittest.TestCase):
+    def test_lock_reports_locked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.store")
+            cli(path, "init")
+            cli(path, "enroll", "471903", "1")
+            code, out = cli(path, "lock")
+            self.assertEqual(code, EXIT_OK)
+            self.assertIn("gesperrt", out.lower())
+
+    def test_lock_missing_store(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "nope.store")
+            code, _ = cli(path, "lock")
+            self.assertEqual(code, EXIT_STORE_ERROR)
+
+
 class TestStatus(unittest.TestCase):
     def test_status_hides_profile_count(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -20,15 +20,19 @@ with the mechanism.
 pip install -r requirements.txt
 
 python3 demo.py                              # walk through the mechanism once
-python3 -m unittest discover -s tests -v     # 60 tests (19 requirements + 41 storage/CLI)
+python3 -m unittest discover -s tests -v     # 83 tests (19 requirements + 64 storage/CLI/lifecycle)
 python3 bench/timing.py --samples 300        # timing measurement (SR-3, SR-9)
 python3 bench/timing.py --samples 12 --kdf strong   # with the concept parameters
+python3 simulate_duress.py                   # walk through the duress scenario once
 
-python3 -m mlsu --store demo.store init      # CLI: create a store
-python3 -m mlsu --store demo.store enroll 471903 1    # enrol profile 1
-python3 -m mlsu --store demo.store enroll 220561 2    # enrol profile 2
-python3 -m mlsu --store demo.store unlock 471903      # check a PIN
-python3 -m mlsu --store demo.store status             # status (no profile count)
+python3 -m mlsu --store demo.store init             # CLI: create a store
+python3 -m mlsu --store demo.store enroll 471903 1  # enrol profile 1
+python3 -m mlsu --store demo.store enroll 220561 2  # enrol profile 2
+python3 -m mlsu --store demo.store unlock 471903    # check a PIN
+python3 -m mlsu --store demo.store change-pin 471903 123456  # change a PIN
+python3 -m mlsu --store demo.store remove 471903    # delete a profile (slot becomes decoy)
+python3 -m mlsu --store demo.store lock             # lock (model: no held state)
+python3 -m mlsu --store demo.store status           # status (no profile count)
 
 make -C ct_core check                # C core: build, unit tests, cross-check against Python
 ```
@@ -76,6 +80,31 @@ permanent lockout only through the delays (30 s → 300 s → 1 h), not in a
 test loop; the tests create the lockout through the API instead. What becomes
 visible is F-1 in action: the **decoy slots and the hidden profile** collect
 failed attempts and get throttled too.
+
+### Lifecycle: change PIN, delete profile, lock
+
+- **`change-pin <old> <new>`** — requires the current PIN, derives new
+  salt/nonce/blob for the same slot. The **profile key stays the same**
+  (like Android's synthetic password: the SP stays, only the protector
+  changes) — otherwise all data would need re-encryption.
+- **`remove <pin>`** — requires the profile's PIN and turns the slot back
+  into a decoy. The profile key is gone; without re-enrolling there is no
+  way back. The file size does not change (fixed file extent).
+- **`lock`** — the model holds no unlock state between invocations; the
+  command documents that on a device this is where the active profile's CE
+  key would be discarded (SR-2).
+
+Both PIN-dependent commands are subject to the same rate limit as `unlock`
+(throttled → exit 3, no derivation).
+
+### Duress scenario
+
+`simulate_duress.py` walks through the concept's core situation once: wrong
+PIN under duress → the restricted area opens, the private one does not exist
+from the examiner's point of view; later back into the private profile via
+the identical lock screen — **without a visible hint** (concept §8.2). The
+script also shows what an observer can measure (fixed file size, F-1
+counters, the constant-time claim) and names the limits (concept §9).
 
 ### Known deviation: the state byte (SR-8)
 

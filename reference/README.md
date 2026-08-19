@@ -20,15 +20,19 @@ gibt es zusätzlich eine persistente Store-Datei und eine Kommandozeile
 pip install -r requirements.txt
 
 python3 demo.py                              # Mechanismus einmal durchspielen
-python3 -m unittest discover -s tests -v     # 60 Tests (19 Anforderungen + 41 Persistenz/CLI)
+python3 -m unittest discover -s tests -v     # 83 Tests (19 Anforderungen + 64 Persistenz/CLI/Lifecycle)
 python3 bench/timing.py --samples 300        # Zeitmessung (SR-3, SR-9)
 python3 bench/timing.py --samples 12 --kdf strong   # mit den Konzeptparametern
+python3 simulate_duress.py                   # Duress-Szenario einmal durchspielen
 
-python3 -m mlsu --store demo.store init      # CLI: Store anlegen
-python3 -m mlsu --store demo.store enroll 471903 1    # Profil 1 einrichten
-python3 -m mlsu --store demo.store enroll 220561 2    # Profil 2 einrichten
-python3 -m mlsu --store demo.store unlock 471903      # PIN prüfen
-python3 -m mlsu --store demo.store status             # Status (ohne Profilzahl)
+python3 -m mlsu --store demo.store init             # CLI: Store anlegen
+python3 -m mlsu --store demo.store enroll 471903 1  # Profil 1 einrichten
+python3 -m mlsu --store demo.store enroll 220561 2  # Profil 2 einrichten
+python3 -m mlsu --store demo.store unlock 471903    # PIN prüfen
+python3 -m mlsu --store demo.store change-pin 471903 123456  # PIN ändern
+python3 -m mlsu --store demo.store remove 471903    # Profil löschen (Slot wird decoy)
+python3 -m mlsu --store demo.store lock             # sperren (Modell: kein gehaltener Zustand)
+python3 -m mlsu --store demo.store status           # Status (ohne Profilzahl)
 
 make -C ct_core check                # C-Kern: bauen, Unit-Tests, Crosscheck gegen Python
 ```
@@ -76,6 +80,31 @@ Fehlversuchen die Dauersperre nur über die Wartezeiten (30 s → 300 s → 1 h)
 nicht in einer Testschleife; die Tests erzeugen die Sperre deshalb über die
 API. Was dabei sichtbar wird, ist F-1 in Aktion: Auch die **Decoy-Slots und
 das versteckte Profil** sammeln Fehlversuche und werden gedrosselt.
+
+### Lebenszyklus: PIN ändern, Profil löschen, sperren
+
+- **`change-pin <alte> <neue>`** — verlangt die aktuelle PIN, erzeugt für
+  denselben Slot neue Salt/Nonce/Blob. Der **Profilschlüssel bleibt
+  derselbe** (wie beim Android-Synthetic-Password: die SP bleibt, nur der
+  Protector wechselt) — sonst müssten alle Daten neu verschlüsselt werden.
+- **`remove <pin>`** — verlangt die PIN des Profils und macht den Slot wieder
+  zu einem Decoy. Der Profilschlüssel ist damit weg; ohne Neu-Einrichtung
+  gibt es kein Zurück. Die Dateigröße ändert sich nicht (fester Dateiumfang).
+- **`lock`** — das Modell hält keinen Entsperr-Zustand zwischen Aufrufen;
+  der Befehl dokumentiert, dass auf einem Gerät hier der CE-Schlüssel des
+  aktiven Profils verworfen würde (SR-2).
+
+Beide PIN-abhängigen Befehle unterliegen derselben Ratenbegrenzung wie
+`unlock` (gedrosselt → Exit 3, keine Ableitung).
+
+### Duress-Szenario
+
+`simulate_duress.py` spielt die Kernsituation aus dem Konzept einmal durch:
+falsche PIN unter Druck → der eingeschränkte Bereich öffnet sich, der private
+existiert aus Sicht des Prüfers nicht; später zurück ins private Profil über
+den identischen Sperrbildschirm — **ohne sichtbaren Hinweis** (Konzept §8.2).
+Das Skript zeigt auch, was ein Beobachter messen kann (feste Dateigröße,
+Zähler-F-1, Konstantzeit-Anspruch) und nennt die Grenzen (Konzept §9).
 
 ### Bekannte Abweichung: der Status-Byte (SR-8)
 

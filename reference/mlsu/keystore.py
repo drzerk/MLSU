@@ -22,7 +22,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from . import ct
-from .counters import WeaverModel
+from .counters import SlotCounter, WeaverModel
 from .params import (
     KDF_STRONG,
     NONCE_LEN,
@@ -60,6 +60,10 @@ class UnlockResult:
     profile_id: int | None
     profile_key: bytes | None
     locked_out: bool = False
+    #: Index of the slot that matched (None on miss/lockout). Not secret in
+    #: this model — the storage state byte already marks enrolled slots —
+    #: but kept out of __repr__ so logs never show it.
+    slot: int | None = None
 
     def __repr__(self) -> str:  # keep key material out of logs and tracebacks
         state = "locked out" if self.locked_out else ("hit" if self.found else "miss")
@@ -150,7 +154,7 @@ class KeyStore:
 
         if not found:
             return UnlockResult(False, None, None)
-        return UnlockResult(True, payload[0], payload[1:])
+        return UnlockResult(True, payload[0], payload[1:], slot=matched_slot)
 
     def rate_limit_remaining(self, now: float | None = None) -> float:
         """Seconds until the next unlock attempt is accepted, 0 if allowed.
@@ -174,6 +178,50 @@ class KeyStore:
                 if elapsed < counter.delay:
                     remaining = max(remaining, counter.delay - elapsed)
         return remaining
+
+    def change_pin(self, old_pin: str, new_pin: str, now: float | None = None) -> tuple[int, int] | None:
+        """Re-key the profile that opens with *old_pin* to *new_pin*.
+
+        Returns ``(slot_index, profile_id)`` on success, ``None`` if the old
+        PIN does not match or the store is locked out.
+
+        The profile key stays the **same**: re-keying the lock must not rotate
+        the encryption key, otherwise all data would need re-encryption. This
+        mirrors Android's synthetic password — the SP stays, only the
+        protector (PIN-derived) changes.
+
+        Side effect, consistent with SR-4/F-1: verifying the old PIN is an
+        unlock attempt, so the matched slot's counter resets and the other
+        slots' counters rise by one — exactly as a successful unlock would.
+        """
+        result = self.unlock(old_pin, now)
+        if not result.found or result.locked_out or result.slot is None:
+            return None
+        salt = os.urandom(SALT_LEN)
+        nonce = os.urandom(NONCE_LEN)
+        payload = bytes([result.profile_id]) + result.profile_key
+        pin_key = derive_pin_key(new_pin, salt, self.kdf)
+        blob = ChaCha20Poly1305(pin_key).encrypt(nonce, payload, None)
+        self.slots[result.slot] = Slot(salt=salt, nonce=nonce, blob=blob)
+        return result.slot, result.profile_id
+
+    def remove_profile(self, pin: str, now: float | None = None) -> tuple[int, int] | None:
+        """Delete the profile that opens with *pin*; the slot becomes a decoy.
+
+        Returns ``(slot_index, profile_id)`` on success, ``None`` otherwise.
+        The profile key is gone with the slot — there is no way back without
+        re-enrolling. The removed slot's counter is reset (it is a fresh
+        decoy); the other slots keep their counters, because verifying the
+        PIN was an unlock attempt charged to them (SR-4/F-1).
+        """
+        result = self.unlock(pin, now)
+        if not result.found or result.locked_out or result.slot is None:
+            return None
+        index = result.slot
+        self.slots[index] = Slot.decoy()
+        self._free_slots.append(index)
+        self.weaver.counters[index] = SlotCounter()
+        return index, result.profile_id
 
     @classmethod
     def restore(
