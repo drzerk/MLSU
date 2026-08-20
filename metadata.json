@@ -1,0 +1,6 @@
+{
+  "name": "MLSU - Multi-Layer Secure Unlock",
+  "description": "Interactive simulation, cryptographic model, and architecture explorer for Multi-Layer Secure Unlock (MLSU) on smartphones.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
