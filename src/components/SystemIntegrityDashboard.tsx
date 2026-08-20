@@ -24,6 +24,10 @@ import {
   ShieldCheck,
   AlertOctagon,
   Sparkles,
+  Battery,
+  BatteryCharging,
+  BatteryWarning,
+  Gauge,
 } from 'lucide-react';
 import { MlsuKeyStore } from '../crypto/mlsuEngine';
 
@@ -63,6 +67,15 @@ export const SystemIntegrityDashboard: React.FC<SystemIntegrityDashboardProps> =
     slotFailureCounters: number[];
     timestamp: string;
   } | null>(null);
+
+  // Simulated Hardware Battery & Energy Profiler
+  // Baseline battery: 94.8% with active SoC discharge tracking
+  const [batteryLevel, setBatteryLevel] = useState<number>(94.8);
+  const [totalJoulesConsumed, setTotalJoulesConsumed] = useState<number>(14.2);
+  const [instantaneousPowerMw, setInstantaneousPowerMw] = useState<number>(380); // Base idle SoC power: 380 mW
+  const [isHighEnergySpike, setIsHighEnergySpike] = useState<boolean>(false);
+  const [lastEnergyDeltaJoules, setLastEnergyDeltaJoules] = useState<number>(0);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
 
   const state = engine.getState();
   const enrolledSlots = state.slots.filter((s) => s.isEnrolled).length;
@@ -206,9 +219,50 @@ export const SystemIntegrityDashboard: React.FC<SystemIntegrityDashboardProps> =
     const interval = setInterval(() => {
       setEntropyHealth((prev) => Math.min(100, Math.max(94, prev + (Math.random() * 4 - 2))));
       setCsprngCalls((prev) => prev + Math.floor(Math.random() * 3));
+
+      // Slow background idle battery discharge (~0.01% every 8s) unless charging
+      setBatteryLevel((prev) => {
+        if (isCharging) return Math.min(100, prev + 0.4);
+        return Math.max(1, prev - 0.008);
+      });
+      setInstantaneousPowerMw((prev) => (isHighEnergySpike ? prev : Math.max(340, Math.min(420, 380 + (Math.random() * 40 - 20)))));
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isCharging, isHighEnergySpike]);
+
+  // Accelerate battery drain and compute energy expenditure whenever cryptographic KDF operations run
+  useEffect(() => {
+    if (!lastExecutionTimeMs || lastExecutionTimeMs <= 0) return;
+
+    // Energy calculation:
+    // Argon2id KDF evaluates 4 slots concurrently.
+    // High-security params (e.g. 64MB RAM, multiple iterations) consume higher CPU/SoC thermal power (~2800-4500 mW).
+    // Fast params consume ~1200-1800 mW.
+    const isHeavyKdf = state.kdf.memoryCostKiB >= 32768 || state.kdf.timeCost >= 3;
+    const peakPowerMw = isHeavyKdf ? 3850 : 1650;
+    
+    // Energy (Joules) = Power (Watts) * Time (Seconds)
+    // 4 parallel slots derivation energy cost
+    const evalDurationSec = lastExecutionTimeMs / 1000;
+    const joulesDelta = (peakPowerMw / 1000) * evalDurationSec * (isHeavyKdf ? 1.4 : 1.0);
+    
+    // Battery percentage drain (assuming typical 5000 mAh @ 3.85V = ~70,000 Joules battery)
+    const nominalCapacityJoules = 70000;
+    const percentageDrop = (joulesDelta / nominalCapacityJoules) * 100 * 45; // Scaled for visible simulator feedback
+
+    setIsHighEnergySpike(true);
+    setInstantaneousPowerMw(peakPowerMw);
+    setLastEnergyDeltaJoules(joulesDelta);
+    setTotalJoulesConsumed((prev) => prev + joulesDelta);
+    setBatteryLevel((prev) => Math.max(1, +(prev - percentageDrop).toFixed(2)));
+
+    const spikeTimer = setTimeout(() => {
+      setIsHighEnergySpike(false);
+      setInstantaneousPowerMw(380);
+    }, 1400);
+
+    return () => clearTimeout(spikeTimer);
+  }, [lastExecutionTimeMs, state.kdf.memoryCostKiB, state.kdf.timeCost]);
 
   const handleReseedEntropy = () => {
     setIsRefreshingEntropy(true);
@@ -419,8 +473,8 @@ export const SystemIntegrityDashboard: React.FC<SystemIntegrityDashboardProps> =
         </div>
       </div>
 
-      {/* 3 Core Metric Panels: Memory, Entropy, Encryption Algos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* 4 Core Metric Panels: Memory, Entropy, Encryption Algos, Simulated Battery & Energy Cost */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* 1. Volatile Memory & Zeroization Monitor */}
         <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 flex flex-col justify-between">
           <div>
@@ -537,6 +591,96 @@ export const SystemIntegrityDashboard: React.FC<SystemIntegrityDashboardProps> =
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
             <span>256-bit Master Root</span>
             <span>Poly1305 MAC Tag</span>
+          </div>
+        </div>
+
+        {/* 4. Simulated Battery Drain & Argon2id Energy Cost */}
+        <div
+          className={`p-3.5 rounded-xl bg-slate-950 border transition-all duration-300 space-y-2.5 flex flex-col justify-between ${
+            isHighEnergySpike
+              ? 'border-amber-500 shadow-lg shadow-amber-950/40 ring-1 ring-amber-500/30'
+              : 'border-slate-800'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-medium flex items-center gap-1.5">
+                {isCharging ? (
+                  <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                ) : batteryLevel < 20 ? (
+                  <BatteryWarning className="w-3.5 h-3.5 text-rose-400" />
+                ) : (
+                  <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                )}
+                Hardware Battery & Power
+              </span>
+              <button
+                onClick={() => setIsCharging(!isCharging)}
+                className={`text-[9px] font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                  isCharging
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+                title="Toggle charger simulation"
+              >
+                {isCharging ? 'CHARGING' : 'DISCHARGING'}
+              </button>
+            </div>
+
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between items-baseline">
+                <span className="text-[11px] text-slate-400">Battery Level:</span>
+                <span
+                  className={`font-mono text-xs font-bold ${
+                    batteryLevel > 50
+                      ? 'text-emerald-400'
+                      : batteryLevel > 20
+                      ? 'text-amber-400'
+                      : 'text-rose-400'
+                  }`}
+                >
+                  {batteryLevel.toFixed(1)}%
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-[11px] text-slate-400">Instantaneous Power:</span>
+                <span
+                  className={`font-mono text-xs font-bold transition-colors ${
+                    isHighEnergySpike ? 'text-amber-300 animate-pulse' : 'text-slate-300'
+                  }`}
+                >
+                  {instantaneousPowerMw} mW {isHighEnergySpike ? '(KDF SPIKE)' : ''}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-[11px] text-slate-400">Argon2id Energy Cost:</span>
+                <span className="font-mono text-xs font-semibold text-cyan-300">
+                  {state.kdf.memoryCostKiB >= 32768 ? 'High (64MB RAM)' : 'Fast (8MB RAM)'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Battery Level Progress Bar */}
+          <div className="space-y-1">
+            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  batteryLevel > 50
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                    : batteryLevel > 20
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                    : 'bg-gradient-to-r from-rose-500 to-red-600'
+                }`}
+                style={{ width: `${Math.max(2, batteryLevel)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500">
+              <span>{totalJoulesConsumed.toFixed(1)}J dissipated</span>
+              <span className={isHighEnergySpike ? 'text-amber-400 font-semibold' : ''}>
+                {lastEnergyDeltaJoules > 0 ? `+${lastEnergyDeltaJoules.toFixed(2)}J last eval` : 'Idle 0.38W'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

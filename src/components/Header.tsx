@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   Lock,
   Cpu,
+  Activity,
 } from 'lucide-react';
 import { ViewTab } from '../types';
 
@@ -17,6 +18,7 @@ interface HeaderProps {
   onTabChange: (tab: ViewTab) => void;
   anyLockedOut: boolean;
   throttledRemaining: number;
+  onOpenGlobalDashboard?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   onTabChange,
   anyLockedOut,
   throttledRemaining,
+  onOpenGlobalDashboard,
 }) => {
   const tabs: Array<{ id: ViewTab; label: string; icon: React.ReactNode }> = [
     { id: 'phone', label: 'Lock Screen Simulator', icon: <Smartphone className="w-4 h-4" /> },
@@ -36,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
+    <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Title */}
@@ -57,8 +60,21 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Status */}
-          <div className="flex items-center gap-3">
+          {/* Right Status & Global Dashboard Trigger */}
+          <div className="flex items-center gap-2.5">
+            {onOpenGlobalDashboard && (
+              <button
+                id="header-open-global-security-btn"
+                onClick={onOpenGlobalDashboard}
+                className="px-2.5 py-1.5 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/80 text-sky-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                title="Open Global Security Threat Dashboard Overlay"
+              >
+                <Activity className="w-3.5 h-3.5 text-sky-400" />
+                <span className="hidden sm:inline">Global Security HUD</span>
+                <span className="sm:hidden">Security HUD</span>
+              </button>
+            )}
+
             {anyLockedOut ? (
               <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1.5 animate-pulse">
                 <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
@@ -100,3 +116,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

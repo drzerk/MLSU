@@ -30,6 +30,7 @@ import {
   Zap,
   Activity,
   BarChart3,
+  TrendingUp,
 } from 'lucide-react';
 import { AuditLogEntry, AuditLogFilter, AuditLogType } from '../types';
 import { SecurityHeatmap } from './SecurityHeatmap';

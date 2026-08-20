@@ -7,6 +7,7 @@ import { HardwareHsmSimulator } from './components/HardwareHsmSimulator';
 import { CliTerminal } from './components/CliTerminal';
 import { BenchmarkRig } from './components/BenchmarkRig';
 import { DocumentationViewer } from './components/DocumentationViewer';
+import { GlobalSecurityDashboard } from './components/GlobalSecurityDashboard';
 import { MlsuKeyStore, KDF_FAST } from './crypto/mlsuEngine';
 import { sealAuditChain, computeEntryHash, GENESIS_PREV_HASH } from './crypto/auditIntegrity';
 import { ViewTab, AuditLogEntry } from './types';
@@ -14,6 +15,7 @@ import { ViewTab, AuditLogEntry } from './types';
 export function App() {
   const [currentTab, setCurrentTab] = useState<ViewTab>('phone');
   const [tick, setTick] = useState<number>(0);
+  const [isGlobalDashboardOpen, setIsGlobalDashboardOpen] = useState<boolean>(false);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([
     {
       id: 'log-boot-1',
@@ -127,6 +129,7 @@ export function App() {
         onTabChange={setCurrentTab}
         anyLockedOut={anyLockedOut}
         throttledRemaining={throttledRemaining}
+        onOpenGlobalDashboard={() => setIsGlobalDashboardOpen(true)}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -168,6 +171,17 @@ export function App() {
           <DocumentationViewer />
         )}
       </main>
+
+      {/* Global Security Threat Dashboard Overlay (Cross-tab HUD) */}
+      <GlobalSecurityDashboard
+        engine={engine}
+        auditLogs={auditLogs}
+        currentTab={currentTab}
+        onNavigateTab={(tab) => setCurrentTab(tab)}
+        isOpen={isGlobalDashboardOpen}
+        onClose={() => setIsGlobalDashboardOpen(false)}
+        onToggle={() => setIsGlobalDashboardOpen((prev) => !prev)}
+      />
 
       <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 space-y-1">
