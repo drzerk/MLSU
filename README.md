@@ -7,10 +7,57 @@
 | | |
 |---|---|
 | **Arbeitstitel** | Multi-Layer Secure Unlock (MLSU) |
-| **Status** | Konzeptpapier — kein Code, keine Implementierung |
-| **Version** | 0.1 (Entwurf) |
-| **Zielplattform** | Android / AOSP (primär), iOS (nur theoretisch) |
-| **Lizenzidee (späterer Code)** | Offen und auditierbar (Apache-2.0 oder GPL-kompatibel) |
+| **Status** | Konzept + Stufe-0-Referenzmodell + interaktiver Simulator |
+| **Version** | 1.0 |
+| **Zielplattform** | Android / AOSP (primär, *nicht* implementiert), iOS (nur theoretisch) |
+| **Lizenz** | Dokumente CC BY-SA 4.0; Laufzeitcode im selben Geist, auditierbar |
+
+---
+
+## Software in diesem Repository
+
+Das Konzept bleibt das Kernprodukt. Zusätzlich liegt hier **lauffähige
+Software**, die das Auswahlmodell prüfbar macht — kein ROM, nichts zum
+Flashen, nichts, das echte Daten schützen darf.
+
+| Teil | Zweck | Einstieg |
+|---|---|---|
+| Interaktiver Simulator | Sperrbildschirm, Duress-Szenario, Slot-/Weaver-Inspektor, Timing-Rig | `npm install && npm run dev` |
+| Python-Referenz | Argon2id + ChaCha20-Poly1305, persistenter Store, CLI | [`reference/README.md`](reference/README.md) |
+| C-Kern | Zweigfreie Auswahl (`fold_select`) als Spezifikation für einen AOSP-Pfad | `make -C reference/ct_core check` |
+
+### Simulator starten
+
+```bash
+npm install
+npm run dev          # http://0.0.0.0:3000  (PORT aus .env)
+npm test             # Vitest: Engine + Audit-Kette
+npm run typecheck
+npm run build && npm start
+```
+
+Demo-PINs der mitgelieferten Profile: **471903** (privat) · **220561** (Reise / Duress).
+
+```bash
+docker compose up --build    # Produktions-Image, Port 3000
+```
+
+### Referenzmodell
+
+```bash
+cd reference
+pip install -r requirements.txt
+python3 demo.py
+python3 -m unittest discover -s tests -v
+python3 -m mlsu --store demo.store init --kdf test
+python3 -m mlsu --store demo.store enroll 471903 1
+python3 -m mlsu --store demo.store enroll 220561 2
+python3 -m mlsu --store demo.store unlock 471903
+make -C ct_core check
+```
+
+Architektur der Laufzeitsoftware: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Konfiguration: [`.env.example`](.env.example).
 
 ---
 

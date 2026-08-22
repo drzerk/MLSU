@@ -31,7 +31,7 @@ import {
   ScanFace,
   Sparkles,
 } from 'lucide-react';
-import { MlsuKeyStore } from '../crypto/mlsuEngine';
+import { Evaluation, MlsuKeyStore } from '../crypto/mlsuEngine';
 import { SAMPLE_PROFILES } from '../data/sampleProfiles';
 import {
   ProfileData,
@@ -82,6 +82,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     pin: string;
     profileId: number;
     profileName: string;
+    evaluation: Evaluation;
   } | null>(null);
   const [isOnScreenScanning, setIsOnScreenScanning] = useState<boolean>(false);
 
@@ -408,42 +409,53 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     const pin = overridePin !== undefined ? overridePin : pinInput;
     if (!pin) return;
 
-    // Check if 2FA Biometric verification is enabled
+    // 2FA: evaluate without charging counters until the biometric confirms.
     if (biometricMode === 'two_factor_verification') {
-      // First dry-run or identify candidate
       setIsProcessing(true);
       try {
-        const outcome = await engine.unlock(pin);
+        const evaluation = await engine.evaluate(pin);
         setIsProcessing(false);
 
-        if (outcome.found && outcome.profileId !== null) {
-          const targetProfile = SAMPLE_PROFILES[outcome.profileId] || { name: `Profile ${outcome.profileId}` };
+        if (evaluation.kind === 'success' && evaluation.outcome.profileId !== null) {
+          const targetProfile = SAMPLE_PROFILES[evaluation.outcome.profileId] || {
+            name: `Profile ${evaluation.outcome.profileId}`,
+          };
           setPendingCandidate({
             pin,
-            profileId: outcome.profileId,
+            profileId: evaluation.outcome.profileId,
             profileName: targetProfile.name,
+            evaluation,
           });
           setIsBiometricModalOpen(true);
           return;
-        } else {
-          // If wrong PIN, let normal failure evaluation handle it immediately
-          setLastOutcome(outcome);
-          onStoreUpdated();
-          const updatedFailures = Math.max(...engine.slots.map((s) => s.failures));
-          addAuditLog({
-            type: 'auth_failure',
-            title: 'Authentication Failed (No Profile Matched)',
-            details: `Evaluated all 4 slots unconditionally in ${outcome.executionTimeMs.toFixed(1)} ms. Weaver failure counters incremented across all slots.`,
-            pinMasked: `${pin.replace(/./g, '•')} (${pin})`,
-            durationMs: outcome.executionTimeMs,
-            weaverFailures: updatedFailures,
-            memoryState: 'No keys loaded. Decoy folding returned zero mask.',
-            severity: 'error',
-          });
-          setPinInput('');
-          return;
         }
-      } catch (err) {
+
+        engine.commit(evaluation);
+        const outcome = evaluation.outcome;
+        setLastOutcome({
+          ...outcome,
+          lockedOut: engine.anyLockedOut,
+          throttledRemaining: engine.rateLimitRemaining(),
+        });
+        onStoreUpdated();
+        const updatedFailures = Math.max(...engine.slots.map((s) => s.failures));
+        addAuditLog({
+          type: outcome.lockedOut ? 'weaver_lockout' : outcome.throttledRemaining > 0 ? 'weaver_throttle' : 'auth_failure',
+          title: outcome.lockedOut
+            ? 'Permanent Weaver Lockout Triggered'
+            : outcome.throttledRemaining > 0
+              ? `Rate Limiter Active (${Math.ceil(outcome.throttledRemaining)}s remaining)`
+              : 'Authentication Failed (No Profile Matched)',
+          details: `Evaluated all ${engine.slotCount} slots unconditionally in ${outcome.executionTimeMs.toFixed(1)} ms. Weaver failure counters incremented across all slots.`,
+          pinMasked: `${pin.replace(/./g, '•')} (${pin})`,
+          durationMs: outcome.executionTimeMs,
+          weaverFailures: updatedFailures,
+          memoryState: 'No keys loaded. Decoy folding returned zero mask.',
+          severity: outcome.throttledRemaining > 0 ? 'warning' : 'error',
+        });
+        setPinInput('');
+        return;
+      } catch {
         setIsProcessing(false);
       }
     }
@@ -454,8 +466,10 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
 
   const handleBiometricModalSuccess = async () => {
     if (!pendingCandidate) return;
-    const { pin, profileId, profileName } = pendingCandidate;
+    const { pin, profileId, profileName, evaluation } = pendingCandidate;
     setIsBiometricModalOpen(false);
+    engine.commit(evaluation);
+    onStoreUpdated();
 
     addAuditLog({
       type: 'biometric_success',
@@ -469,7 +483,12 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
       severity: 'success',
     });
 
-    await executeDirectUnlock(pin, false);
+    const outcome = evaluation.outcome;
+    setLastOutcome(outcome);
+    setActiveProfileId(outcome.profileId);
+    setIsUnlocked(true);
+    setActiveTab('home');
+    setPinInput('');
     setPendingCandidate(null);
   };
 
@@ -547,6 +566,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
       severity: 'info',
     });
 
+    engine.lock();
     setIsUnlocked(false);
     setActiveProfileId(null);
     setPinInput('');

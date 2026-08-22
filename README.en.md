@@ -7,10 +7,57 @@
 | | |
 |---|---|
 | **Working title** | Multi-Layer Secure Unlock (MLSU) |
-| **Status** | Concept paper — no code, no implementation |
-| **Version** | 0.1 (draft) |
-| **Target platform** | Android / AOSP (primary), iOS (theoretical only) |
-| **Licensing intent (future code)** | Open and auditable (Apache-2.0 or GPL-compatible) |
+| **Status** | Concept + Stufe-0 reference model + interactive simulator |
+| **Version** | 1.0 |
+| **Target platform** | Android / AOSP (primary, *not* implemented), iOS (theoretical only) |
+| **Licence** | Documents CC BY-SA 4.0; runtime code in the same auditable spirit |
+
+---
+
+## Software in this repository
+
+The concept paper remains the core product. This tree also contains **runnable
+software** that makes the selection model testable — not a ROM, nothing to
+flash, nothing that may protect real data.
+
+| Piece | Purpose | Start here |
+|---|---|---|
+| Interactive simulator | Lock screen, duress walk-through, slot/Weaver inspector, timing rig | `npm install && npm run dev` |
+| Python reference | Argon2id + ChaCha20-Poly1305, persistent store, CLI | [`reference/README.en.md`](reference/README.en.md) |
+| C core | Branch-free selection (`fold_select`) as a spec for an AOSP path | `make -C reference/ct_core check` |
+
+### Running the simulator
+
+```bash
+npm install
+npm run dev          # http://0.0.0.0:3000  (PORT from .env)
+npm test             # Vitest: engine + audit chain
+npm run typecheck
+npm run build && npm start
+```
+
+Demo PINs of the bundled profiles: **471903** (private) · **220561** (travel / duress).
+
+```bash
+docker compose up --build    # production image, port 3000
+```
+
+### Reference model
+
+```bash
+cd reference
+pip install -r requirements.txt
+python3 demo.py
+python3 -m unittest discover -s tests -v
+python3 -m mlsu --store demo.store init --kdf test
+python3 -m mlsu --store demo.store enroll 471903 1
+python3 -m mlsu --store demo.store enroll 220561 2
+python3 -m mlsu --store demo.store unlock 471903
+make -C ct_core check
+```
+
+Runtime architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Configuration: [`.env.example`](.env.example).
 
 ---
 

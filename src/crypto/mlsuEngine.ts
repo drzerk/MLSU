@@ -30,6 +30,10 @@ export function throttleSeconds(failures: number): number {
   return 3600;
 }
 
+function toBufferSource(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 export function generateRandomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -71,7 +75,7 @@ export async function derivePinKey(pin: string, salt: Uint8Array, kdf: KdfConfig
     try {
       const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        combined,
+        toBufferSource(combined),
         { name: 'PBKDF2' },
         false,
         ['deriveBits']
@@ -80,7 +84,7 @@ export async function derivePinKey(pin: string, salt: Uint8Array, kdf: KdfConfig
       const derived = await crypto.subtle.deriveBits(
         {
           name: 'PBKDF2',
-          salt: salt,
+          salt: toBufferSource(salt),
           iterations: iterations,
           hash: 'SHA-256',
         },
@@ -114,7 +118,7 @@ export async function aeadEncrypt(key: Uint8Array, nonce: Uint8Array, payload: U
     try {
       const cryptoKey = await crypto.subtle.importKey(
         'raw',
-        key,
+        toBufferSource(key),
         { name: 'AES-GCM' },
         false,
         ['encrypt']
@@ -122,11 +126,11 @@ export async function aeadEncrypt(key: Uint8Array, nonce: Uint8Array, payload: U
       const ciphertext = await crypto.subtle.encrypt(
         {
           name: 'AES-GCM',
-          iv: nonce,
+          iv: toBufferSource(nonce),
           tagLength: 128,
         },
         cryptoKey,
-        payload
+        toBufferSource(payload)
       );
       return new Uint8Array(ciphertext);
     } catch (e) {
@@ -154,7 +158,7 @@ export async function aeadDecrypt(key: Uint8Array, nonce: Uint8Array, blob: Uint
     try {
       const cryptoKey = await crypto.subtle.importKey(
         'raw',
-        key,
+        toBufferSource(key),
         { name: 'AES-GCM' },
         false,
         ['decrypt']
@@ -162,11 +166,11 @@ export async function aeadDecrypt(key: Uint8Array, nonce: Uint8Array, blob: Uint
       const decrypted = await crypto.subtle.decrypt(
         {
           name: 'AES-GCM',
-          iv: nonce,
+          iv: toBufferSource(nonce),
           tagLength: 128,
         },
         cryptoKey,
-        blob
+        toBufferSource(blob)
       );
       return { ok: true, payload: new Uint8Array(decrypted) };
     } catch {
@@ -264,6 +268,15 @@ export class SlotModel {
   }
 }
 
+export type EvaluationKind = 'lockout' | 'throttled' | 'success' | 'failure';
+
+export interface Evaluation {
+  outcome: UnlockOutcome;
+  kind: EvaluationKind;
+  matchedSlotIndex: number | null;
+  now: number;
+}
+
 export interface SlotRotationStep {
   slotIndex: number;
   isEnrolled: boolean;
@@ -297,7 +310,9 @@ export class MlsuKeyStore {
   slots: SlotModel[];
   freeSlots: number[];
   masterSeed: Uint8Array;
-  enrolledPins: Map<number, string>; // Keystore ephemeral secure memory (unlocked session/secure enclave)
+  enrolledPins: Map<number, string>; // Simulator convenience for re-keying; not a master secret
+  activeProfileId: number | null;
+  private activeProfileKey: Uint8Array | null;
 
   constructor(kdf: KdfConfig = KDF_FAST, slotCount = SLOT_COUNT) {
     this.kdf = kdf;
@@ -306,6 +321,30 @@ export class MlsuKeyStore {
     this.freeSlots = Array.from({ length: slotCount }, (_, i) => i);
     this.masterSeed = generateRandomBytes(32);
     this.enrolledPins = new Map();
+    this.activeProfileId = null;
+    this.activeProfileKey = null;
+  }
+
+  /**
+   * Drop the session CE key from the model. Documents SR-2 at userspace level;
+   * JavaScript cannot prove the bytes are gone from the heap (finding F-2).
+   */
+  lock(): void {
+    if (this.activeProfileKey) {
+      this.activeProfileKey.fill(0);
+      this.activeProfileKey = null;
+    }
+    this.activeProfileId = null;
+  }
+
+  reinitialize(slotCount = this.slotCount, kdf: KdfConfig = this.kdf): void {
+    this.lock();
+    this.kdf = kdf;
+    this.slotCount = slotCount;
+    this.slots = Array.from({ length: slotCount }, () => SlotModel.createDecoy());
+    this.freeSlots = Array.from({ length: slotCount }, (_, i) => i);
+    this.masterSeed = generateRandomBytes(32);
+    this.enrolledPins.clear();
   }
 
   getMasterSeedHex(): string {
@@ -342,6 +381,17 @@ export class MlsuKeyStore {
     if (profileId < 0 || profileId > 255) {
       throw new Error('Profile ID must fit in 1 byte (0-255)');
     }
+    if (pin.length < 4) {
+      throw new Error('PIN must be at least 4 characters');
+    }
+    if (this.slots.some((slot) => slot.isEnrolled && slot.profileId === profileId)) {
+      throw new Error(`Profile ${profileId} is already enrolled`);
+    }
+
+    const probe = await this.evaluate(pin);
+    if (probe.kind === 'success') {
+      throw new Error('PIN already unlocks an enrolled profile');
+    }
 
     // Pick random free slot to hide enrolment order
     const randIndex = Math.floor(Math.random() * this.freeSlots.length);
@@ -363,33 +413,47 @@ export class MlsuKeyStore {
     return slotIdx;
   }
 
-  async unlock(pin: string, now = Date.now() / 1000): Promise<UnlockOutcome> {
+  /**
+   * Derive against every slot without touching Weaver counters.
+   * Use with {@link commit} so 2FA can inspect a hit before charging.
+   */
+  async evaluate(pin: string, now = Date.now() / 1000): Promise<Evaluation> {
     const startTime = performance.now();
     const throttled = this.rateLimitRemaining(now);
 
     if (this.anyLockedOut) {
       return {
-        found: false,
-        profileId: null,
-        profileKeyHex: null,
-        slotIndex: null,
-        lockedOut: true,
-        throttledRemaining: Infinity,
-        executionTimeMs: performance.now() - startTime,
-        message: 'Permanent lockout active (too many failed attempts)',
+        kind: 'lockout',
+        matchedSlotIndex: null,
+        now,
+        outcome: {
+          found: false,
+          profileId: null,
+          profileKeyHex: null,
+          slotIndex: null,
+          lockedOut: true,
+          throttledRemaining: Infinity,
+          executionTimeMs: performance.now() - startTime,
+          message: 'Permanent lockout active (too many failed attempts)',
+        },
       };
     }
 
     if (throttled > 0) {
       return {
-        found: false,
-        profileId: null,
-        profileKeyHex: null,
-        slotIndex: null,
-        lockedOut: false,
-        throttledRemaining: throttled,
-        executionTimeMs: performance.now() - startTime,
-        message: `Rate limiter active. Retry in ${Math.ceil(throttled)} seconds.`,
+        kind: 'throttled',
+        matchedSlotIndex: null,
+        now,
+        outcome: {
+          found: false,
+          profileId: null,
+          profileKeyHex: null,
+          slotIndex: null,
+          lockedOut: false,
+          throttledRemaining: throttled,
+          executionTimeMs: performance.now() - startTime,
+          message: `Rate limiter active. Retry in ${Math.ceil(throttled)} seconds.`,
+        },
       };
     }
 
@@ -410,32 +474,24 @@ export class MlsuKeyStore {
       }
     }
 
-    // Branch-free candidate folding
     const { found, payload } = foldSelect(candidates, PAYLOAD_LEN);
-
-    // Update Weaver counters across ALL slots (Finding F-1)
-    for (let i = 0; i < this.slots.length; i++) {
-      if (i === matchedSlotIndex) {
-        this.slots[i].failures = 0;
-        this.slots[i].lastFailureAt = null;
-      } else {
-        this.slots[i].failures += 1;
-        this.slots[i].lastFailureAt = now;
-      }
-    }
-
     const execTime = performance.now() - startTime;
 
     if (!found || matchedSlotIndex === null) {
       return {
-        found: false,
-        profileId: null,
-        profileKeyHex: null,
-        slotIndex: null,
-        lockedOut: this.anyLockedOut,
-        throttledRemaining: this.rateLimitRemaining(now),
-        executionTimeMs: execTime,
-        message: 'Invalid PIN. Evaluated all 4 slots in constant time.',
+        kind: 'failure',
+        matchedSlotIndex: null,
+        now,
+        outcome: {
+          found: false,
+          profileId: null,
+          profileKeyHex: null,
+          slotIndex: null,
+          lockedOut: this.anyLockedOut,
+          throttledRemaining: 0,
+          executionTimeMs: execTime,
+          message: `Invalid PIN. Evaluated all ${this.slotCount} slots in constant time.`,
+        },
       };
     }
 
@@ -443,15 +499,62 @@ export class MlsuKeyStore {
     const profileKey = payload.slice(1);
 
     return {
-      found: true,
-      profileId,
-      profileKeyHex: bytesToHex(profileKey),
-      slotIndex: matchedSlotIndex,
-      lockedOut: false,
-      throttledRemaining: 0,
-      executionTimeMs: execTime,
-      message: `Unlocked Profile ${profileId} via Slot ${matchedSlotIndex + 1}.`,
+      kind: 'success',
+      matchedSlotIndex,
+      now,
+      outcome: {
+        found: true,
+        profileId,
+        profileKeyHex: bytesToHex(profileKey),
+        slotIndex: matchedSlotIndex,
+        lockedOut: false,
+        throttledRemaining: 0,
+        executionTimeMs: execTime,
+        message: `Unlocked Profile ${profileId} via Slot ${matchedSlotIndex + 1}.`,
+      },
     };
+  }
+
+  /**
+   * Apply Weaver side-effects. A hit resets only the matched slot (SR-4);
+   * a miss charges every slot (F-1).
+   */
+  commit(evaluation: Evaluation): void {
+    if (evaluation.kind === 'lockout' || evaluation.kind === 'throttled') {
+      return;
+    }
+
+    if (evaluation.kind === 'success' && evaluation.matchedSlotIndex !== null) {
+      const matched = evaluation.matchedSlotIndex;
+      this.slots[matched].failures = 0;
+      this.slots[matched].lastFailureAt = null;
+      this.activeProfileId = evaluation.outcome.profileId;
+      this.activeProfileKey = evaluation.outcome.profileKeyHex
+        ? hexToBytes(evaluation.outcome.profileKeyHex)
+        : null;
+      return;
+    }
+
+    for (const slot of this.slots) {
+      if (slot.failures < MAX_FAILURES) {
+        slot.failures += 1;
+      }
+      slot.lastFailureAt = evaluation.now;
+    }
+    this.lock();
+  }
+
+  async unlock(pin: string, now = Date.now() / 1000): Promise<UnlockOutcome> {
+    const evaluation = await this.evaluate(pin, now);
+    this.commit(evaluation);
+    if (evaluation.kind === 'failure') {
+      return {
+        ...evaluation.outcome,
+        lockedOut: this.anyLockedOut,
+        throttledRemaining: this.rateLimitRemaining(now),
+      };
+    }
+    return evaluation.outcome;
   }
 
   async changePin(oldPin: string, newPin: string, now = Date.now() / 1000): Promise<{ slotIndex: number; profileId: number } | null> {

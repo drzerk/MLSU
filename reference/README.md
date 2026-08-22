@@ -20,7 +20,7 @@ gibt es zusätzlich eine persistente Store-Datei und eine Kommandozeile
 pip install -r requirements.txt
 
 python3 demo.py                              # Mechanismus einmal durchspielen
-python3 -m unittest discover -s tests -v     # 83 Tests (19 Anforderungen + 64 Persistenz/CLI/Lifecycle)
+python3 -m unittest discover -s tests -v     # 62 Tests (Anforderungen, Persistenz, CLI, Lebenszyklus, CT)
 python3 bench/timing.py --samples 300        # Zeitmessung (SR-3, SR-9)
 python3 bench/timing.py --samples 12 --kdf strong   # mit den Konzeptparametern
 python3 simulate_duress.py                   # Duress-Szenario einmal durchspielen

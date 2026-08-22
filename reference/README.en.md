@@ -20,7 +20,7 @@ with the mechanism.
 pip install -r requirements.txt
 
 python3 demo.py                              # walk through the mechanism once
-python3 -m unittest discover -s tests -v     # 83 tests (19 requirements + 64 storage/CLI/lifecycle)
+python3 -m unittest discover -s tests -v     # 62 tests (requirements, persistence, CLI, lifecycle, CT)
 python3 bench/timing.py --samples 300        # timing measurement (SR-3, SR-9)
 python3 bench/timing.py --samples 12 --kdf strong   # with the concept parameters
 python3 simulate_duress.py                   # walk through the duress scenario once

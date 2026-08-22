@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+dist
+.venv
+__pycache__
+*.store
+coverage
+.vite
+reference/ct_core/mlsu_ct_cli
+reference/ct_core/test_mlsu_ct
+*.md
+docs
+!README.md

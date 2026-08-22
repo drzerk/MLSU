@@ -8,7 +8,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { MlsuKeyStore } from '../crypto/mlsuEngine';
+import { KDF_FAST, KDF_STRONG, MlsuKeyStore } from '../crypto/mlsuEngine';
 
 interface CliTerminalProps {
   engine: MlsuKeyStore;
@@ -83,12 +83,7 @@ export const CliTerminal: React.FC<CliTerminalProps> = ({ engine, onStoreUpdated
           const slotsArg = args.find((a) => a.startsWith('--slots=') || !isNaN(Number(a)));
           const slotNum = slotsArg ? parseInt(slotsArg.replace('--slots=', '')) || 4 : 4;
 
-          engine.slotCount = slotNum;
-          engine.slots = Array.from({ length: slotNum }, () => {
-            const s = (engine as any).constructor.createDecoy ? (engine as any).constructor.createDecoy() : new (engine.slots[0].constructor as any)();
-            return s;
-          });
-          engine.resetFailureCounters();
+          engine.reinitialize(slotNum, kdfChoice === 'strong' ? KDF_STRONG : KDF_FAST);
           onStoreUpdated();
 
           output = `Neuer Store angelegt: mlsu.store\n  Slots: ${slotNum} (alle decoys), KDF: Argon2id (${kdfChoice})`;
