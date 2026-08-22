@@ -1,2 +1,82 @@
-# Moved to .github/workflows/ci.yml — this file is kept so older docs still resolve.
-# See that workflow for Python reference tests, the C core, and the TypeScript simulator.
+# Copy to .github/workflows/ci.yml once the repo token has the `workflows` scope.
+# The GitHub App used to push this branch cannot create workflow files.
+
+name: CI
+
+on:
+  push:
+    branches: [main, arena/**]
+  pull_request:
+
+jobs:
+  reference:
+    name: Reference model (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: reference/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Requirement, persistence and CLI tests
+        run: python -m unittest discover -s tests -v
+      - name: Smoke test — demo
+        run: python demo.py
+      - name: Smoke test — duress walk-through
+        run: python simulate_duress.py
+      - name: Smoke test — timing rig
+        run: python bench/timing.py --samples 8 --kdf test
+
+  ct-core:
+    name: C constant-time core
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reference/ct_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build, unit test and cross-check against Python
+        run: make check
+
+  lint-python:
+    name: Lint (pyflakes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reference
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pyflakes
+        run: pip install pyflakes
+      - name: Lint
+        run: python -m pyflakes mlsu tests demo.py simulate_duress.py bench/timing.py ct_core/crosscheck.py
+
+  web:
+    name: Simulator (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
