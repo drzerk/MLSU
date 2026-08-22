@@ -31,6 +31,8 @@ import {
   Activity,
   BarChart3,
   TrendingUp,
+  Sparkles,
+  Link,
 } from 'lucide-react';
 import { AuditLogEntry, AuditLogFilter, AuditLogType } from '../types';
 import { SecurityHeatmap } from './SecurityHeatmap';

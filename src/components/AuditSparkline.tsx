@@ -106,12 +106,12 @@ export const AuditSparkline: React.FC<AuditSparklineProps> = ({ logs, onSelectHo
 
     let maxEvents = 0;
     let peak: HourBucket | null = null;
-    buckets.forEach((b) => {
-      if (b.totalEvents > maxEvents) {
-        maxEvents = b.totalEvents;
-        peak = b;
+    for (const bucket of buckets) {
+      if (bucket.totalEvents > maxEvents) {
+        maxEvents = bucket.totalEvents;
+        peak = bucket;
       }
-    });
+    }
 
     return {
       hourBuckets: buckets,

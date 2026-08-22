@@ -104,16 +104,38 @@ export function App() {
   };
 
   const engineRef = useRef<MlsuKeyStore | null>(null);
+  const initStartedRef = useRef<boolean>(false);
+  const [engineReady, setEngineReady] = useState<boolean>(false);
 
-  if (!engineRef.current) {
+  useEffect(() => {
+    if (initStartedRef.current) {
+      if (engineRef.current) {
+        setEngineReady(true);
+      }
+      return;
+    }
+    initStartedRef.current = true;
     const store = new MlsuKeyStore(KDF_FAST, 4);
-    // Initialize default profiles
-    store.enroll('471903', 1); // Profile 1: Private Space
-    store.enroll('220561', 2); // Profile 2: Travel / Decoy
-    engineRef.current = store;
-  }
+    void (async () => {
+      await store.enroll('471903', 1);
+      await store.enroll('220561', 2);
+      engineRef.current = store;
+      setEngineReady(true);
+    })();
+  }, []);
 
   const engine = engineRef.current;
+
+  if (!engineReady || !engine) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 mx-auto rounded-xl bg-sky-600/20 border border-sky-700 animate-pulse" />
+          <p className="text-sm text-slate-400 font-mono">Sealing default MLSU slots…</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleStoreUpdated = () => {
     setTick((t) => t + 1);
