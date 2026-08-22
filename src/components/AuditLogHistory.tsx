@@ -33,10 +33,13 @@ import {
   TrendingUp,
   Sparkles,
   Link,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { AuditLogEntry, AuditLogFilter, AuditLogType } from '../types';
 import { SecurityHeatmap } from './SecurityHeatmap';
 import { AuditSparkline } from './AuditSparkline';
+import { downloadAuditLogsCSV } from '../utils/csvExport';
 
 interface AuditLogHistoryProps {
   logs: AuditLogEntry[];
@@ -58,6 +61,8 @@ export const AuditLogHistory: React.FC<AuditLogHistoryProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isExportingCSV, setIsExportingCSV] = useState<boolean>(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
   const [showSparkline, setShowSparkline] = useState<boolean>(true);
   const [selectedBucketLogs, setSelectedBucketLogs] = useState<AuditLogEntry[] | null>(null);
@@ -126,19 +131,39 @@ export const AuditLogHistory: React.FC<AuditLogHistoryProps> = ({
       l.type === 'hsm_tamper_recovered'
   ).length;
 
-  const handleExportJSON = () => {
+  const handleExportJSON = (exportFilteredOnly: boolean = false) => {
+    const targetLogs = exportFilteredOnly ? filteredLogs : logs;
+    if (targetLogs.length === 0) return;
     setIsExporting(true);
-    const dataStr = JSON.stringify(logs, null, 2);
+    const dataStr = JSON.stringify(targetLogs, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `mlsu-audit-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    const prefix = exportFilteredOnly ? 'mlsu-audit-filtered' : 'mlsu-audit-log';
+    link.download = `${prefix}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setTimeout(() => setIsExporting(false), 800);
+    setExportNotice(
+      `Exported ${targetLogs.length} event${targetLogs.length === 1 ? '' : 's'} as JSON.`
+    );
+    setTimeout(() => setIsExporting(false), 600);
+    setTimeout(() => setExportNotice(null), 4500);
+  };
+
+  const handleExportCSV = (exportFilteredOnly: boolean = false) => {
+    const targetLogs = exportFilteredOnly ? filteredLogs : logs;
+    if (targetLogs.length === 0) return;
+    setIsExportingCSV(true);
+    const prefix = exportFilteredOnly ? 'mlsu-audit-filtered' : 'mlsu-audit-forensic';
+    downloadAuditLogsCSV(targetLogs, prefix);
+    setExportNotice(
+      `Exported ${targetLogs.length} event${targetLogs.length === 1 ? '' : 's'} to CSV for SIEM / external analysis.`
+    );
+    setTimeout(() => setIsExportingCSV(false), 600);
+    setTimeout(() => setExportNotice(null), 4500);
   };
 
   const getLogIcon = (type: AuditLogType) => {
@@ -293,7 +318,7 @@ export const AuditLogHistory: React.FC<AuditLogHistoryProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             id="toggle-audit-sparkline-btn"
             onClick={() => setShowSparkline((prev) => !prev)}
@@ -321,20 +346,36 @@ export const AuditLogHistory: React.FC<AuditLogHistoryProps> = ({
             <span>{showHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}</span>
           </button>
           <button
-            id="export-audit-logs-btn"
-            onClick={handleExportJSON}
+            id="export-audit-csv-btn"
+            onClick={() => handleExportCSV(filteredLogs.length !== logs.length)}
             disabled={logs.length === 0}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-700 transition-colors"
-            title="Download full forensic log in JSON format"
+            className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 disabled:opacity-40 text-xs font-semibold flex items-center gap-1.5 border border-emerald-700/80 transition-colors shadow-sm cursor-pointer"
+            title={`Export ${filteredLogs.length !== logs.length ? `filtered (${filteredLogs.length})` : `all (${logs.length})`} audit events to RFC-4180 CSV for external SIEM / Excel / Pandas analysis`}
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>{isExporting ? 'Exporting...' : 'Export JSON'}</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>
+              {isExportingCSV
+                ? 'Exporting CSV...'
+                : filteredLogs.length !== logs.length
+                ? `Export CSV (${filteredLogs.length})`
+                : 'Export CSV'}
+            </span>
+          </button>
+          <button
+            id="export-audit-logs-btn"
+            onClick={() => handleExportJSON(filteredLogs.length !== logs.length)}
+            disabled={logs.length === 0}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+            title="Download forensic log in JSON format"
+          >
+            <Download className="w-3.5 h-3.5 text-sky-400" />
+            <span>{isExporting ? 'Exporting JSON...' : 'Export JSON'}</span>
           </button>
           <button
             id="clear-audit-logs-btn"
             onClick={onClearLogs}
             disabled={logs.length === 0}
-            className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 disabled:opacity-40 text-rose-300 text-xs font-medium flex items-center gap-1.5 border border-rose-900 transition-colors"
+            className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 disabled:opacity-40 text-rose-300 text-xs font-medium flex items-center gap-1.5 border border-rose-900 transition-colors cursor-pointer"
             title="Clear all recorded events"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -342,6 +383,22 @@ export const AuditLogHistory: React.FC<AuditLogHistoryProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Export Confirmation Notice */}
+      {exportNotice && (
+        <div className="p-2.5 rounded-xl bg-emerald-950/90 border border-emerald-700 text-emerald-200 text-xs flex items-center justify-between shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{exportNotice}</span>
+          </div>
+          <button
+            onClick={() => setExportNotice(null)}
+            className="text-emerald-400 hover:text-white text-xs px-1 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 24-Hour Security Event Velocity Sparkline */}
       {showSparkline && (

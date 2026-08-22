@@ -24,6 +24,7 @@ import {
   Trash2,
   PlusCircle,
   Edit3,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { AuditLogEntry, AuditChainVerificationResult } from '../types';
 import {
@@ -31,6 +32,7 @@ import {
   verifyAuditLogChain,
   GENESIS_PREV_HASH,
 } from '../crypto/auditIntegrity';
+import { downloadAuditLogsCSV } from '../utils/csvExport';
 
 interface SecurityAuditIntegrityCheckProps {
   logs: AuditLogEntry[];
@@ -254,6 +256,16 @@ export const SecurityAuditIntegrityCheck: React.FC<SecurityAuditIntegrityCheckPr
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            id="export-ledger-csv-btn"
+            onClick={() => downloadAuditLogsCSV(logs, 'mlsu-sealed-ledger-chain')}
+            disabled={logs.length === 0}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors shadow-sm cursor-pointer"
+            title="Download cryptographically chained audit ledger as CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Export CSV</span>
+          </button>
           <button
             id="run-integrity-scan-btn"
             onClick={handleRunVerification}

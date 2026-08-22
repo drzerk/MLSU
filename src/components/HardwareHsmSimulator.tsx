@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { MlsuKeyStore } from '../crypto/mlsuEngine';
 import { AuditLogEntry } from '../types';
+import { HsmFlowDiagram } from './HsmFlowDiagram';
 
 interface HardwareHsmSimulatorProps {
   engine: MlsuKeyStore;
@@ -172,6 +173,15 @@ export const HardwareHsmSimulator: React.FC<HardwareHsmSimulatorProps> = ({
           Simulate real-world hardware attacks: corrupt specific flash storage sectors (AEAD tag, Nonce IV, Salt, or Ciphertext) or inject voltage glitches to observe how the <strong className="text-sky-300 font-mono">Weaver Hardware Rate-Limiter</strong> and Phone Lock Screen react defensively.
         </p>
       </div>
+
+      {/* D3 Cryptographic Interaction Flow Diagram */}
+      <HsmFlowDiagram
+        engine={engine}
+        selectedSlotIndex={selectedSlot}
+        onSelectSlot={(idx) => setSelectedSlot(idx)}
+        targetSector={targetSector}
+        tamperMode={tamperMode}
+      />
 
       {/* Main Grid: Hardware Controls & Live Storage Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

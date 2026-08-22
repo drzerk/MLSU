@@ -4,6 +4,7 @@ import { PhoneSimulator } from './components/PhoneSimulator';
 import { DuressWalkthrough } from './components/DuressWalkthrough';
 import { SlotInspector } from './components/SlotInspector';
 import { HardwareHsmSimulator } from './components/HardwareHsmSimulator';
+import { FirmwarePacker } from './components/FirmwarePacker';
 import { CliTerminal } from './components/CliTerminal';
 import { BenchmarkRig } from './components/BenchmarkRig';
 import { DocumentationViewer } from './components/DocumentationViewer';
@@ -182,6 +183,9 @@ export function App() {
             onNavigateToPhone={() => setCurrentTab('phone')}
             onAddAuditLog={addAuditLog}
           />
+        )}
+        {currentTab === 'packer' && (
+          <FirmwarePacker engine={engine} />
         )}
         {currentTab === 'cli' && (
           <CliTerminal engine={engine} onStoreUpdated={handleStoreUpdated} />

@@ -58,7 +58,7 @@ export interface BenchmarkResult {
   durationMs: number;
 }
 
-export type ViewTab = 'phone' | 'scenario' | 'inspector' | 'hsm' | 'cli' | 'benchmark' | 'docs';
+export type ViewTab = 'phone' | 'scenario' | 'inspector' | 'hsm' | 'packer' | 'cli' | 'benchmark' | 'docs';
 export type Language = 'en' | 'de';
 
 export type AuditLogType = 

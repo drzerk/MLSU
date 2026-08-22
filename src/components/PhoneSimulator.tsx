@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Lock,
   Unlock,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Key,
   FolderLock,
   Smartphone,
@@ -12,6 +13,7 @@ import {
   AlertTriangle,
   RotateCcw,
   Clock,
+  Timer,
   Battery,
   Wifi,
   Signal,
@@ -73,6 +75,14 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [showKeyDetails, setShowKeyDetails] = useState<boolean>(false);
+
+  // Inactivity Auto-Lock State (SR-2 Volatile RAM Key Sanitization)
+  const AUTO_LOCK_TIMEOUT_SECONDS = 30;
+  const [autoLockDuration, setAutoLockDuration] = useState<number>(AUTO_LOCK_TIMEOUT_SECONDS);
+  const [autoLockSecondsLeft, setAutoLockSecondsLeft] = useState<number>(AUTO_LOCK_TIMEOUT_SECONDS);
+  const [isAutoLockEnabled, setIsAutoLockEnabled] = useState<boolean>(true);
+  const [autoLockTriggeredNotice, setAutoLockTriggeredNotice] = useState<boolean>(false);
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Biometric Security Layer State
   const [biometricMode, setBiometricMode] = useState<BiometricMode>('two_factor_verification');
@@ -201,6 +211,67 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     }
   };
 
+  const executeAutoLock = useCallback(() => {
+    if (!isUnlocked) return;
+    const prevProfile = activeProfileId ? SAMPLE_PROFILES[activeProfileId]?.name || `Profile ${activeProfileId}` : 'Active Profile';
+
+    addAuditLog({
+      type: 'device_lock',
+      title: 'Auto-Lock Triggered (30s Inactivity) ➔ CE Key Purged from RAM',
+      details: `Inactivity security threshold (30 seconds) reached. Credential Encrypted (CE) class key was zeroized from volatile memory (SR-2 zero-leakage).`,
+      pinMasked: 'N/A',
+      profileId: activeProfileId,
+      profileName: prevProfile,
+      memoryState: 'RAM completely sanitized. Device returned to uniform single-screen lock.',
+      severity: 'info',
+    });
+
+    engine.lock();
+    setIsUnlocked(false);
+    setActiveProfileId(null);
+    setPinInput('');
+    setLastOutcome(null);
+    setActiveTab('home');
+    setAutoLockTriggeredNotice(true);
+    onStoreUpdated();
+  }, [isUnlocked, activeProfileId, engine, onStoreUpdated, addAuditLog]);
+
+  // Auto-Lock Inactivity Tracker (30-second security window)
+  useEffect(() => {
+    if (!isUnlocked || !isAutoLockEnabled) {
+      return;
+    }
+
+    lastActivityRef.current = Date.now();
+    setAutoLockSecondsLeft(autoLockDuration);
+
+    const onUserActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => {
+      window.addEventListener(evt, onUserActivity, { passive: true });
+    });
+
+    const timer = setInterval(() => {
+      const elapsedSec = Math.floor((Date.now() - lastActivityRef.current) / 1000);
+      const remaining = Math.max(0, autoLockDuration - elapsedSec);
+      setAutoLockSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        executeAutoLock();
+      }
+    }, 500);
+
+    return () => {
+      events.forEach((evt) => {
+        window.removeEventListener(evt, onUserActivity);
+      });
+      clearInterval(timer);
+    };
+  }, [isUnlocked, isAutoLockEnabled, autoLockDuration, executeAutoLock]);
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -296,6 +367,9 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
         setIsUnlocked(true);
         setActiveTab('home');
         setPinInput('');
+        setAutoLockTriggeredNotice(false);
+        lastActivityRef.current = Date.now();
+        setAutoLockSecondsLeft(autoLockDuration);
       } else {
         const updatedFailures = Math.max(...engine.slots.map((s) => s.failures));
         addAuditLog({
@@ -490,6 +564,9 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     setActiveTab('home');
     setPinInput('');
     setPendingCandidate(null);
+    setAutoLockTriggeredNotice(false);
+    lastActivityRef.current = Date.now();
+    setAutoLockSecondsLeft(autoLockDuration);
   };
 
   const handleBiometricModalFail = (reason: string) => {
@@ -572,6 +649,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     setPinInput('');
     setLastOutcome(null);
     setActiveTab('home');
+    setAutoLockTriggeredNotice(false);
     onStoreUpdated();
   };
 
@@ -679,6 +757,23 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                   <h1 className="text-3xl font-light tracking-tight text-white">{currentTime || '13:42'}</h1>
                   <p className="text-xs text-slate-400 mt-0.5">{currentDate || 'Wednesday, Aug 19'}</p>
                 </div>
+
+                {/* Auto-Lock Trigger Notice */}
+                {autoLockTriggeredNotice && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-sky-950/80 border border-sky-800 text-sky-200 text-[11px] flex items-center justify-between gap-2 shadow-lg">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span className="truncate">Auto-locked (30s inactivity). RAM zeroized.</span>
+                    </div>
+                    <button
+                      onClick={() => setAutoLockTriggeredNotice(false)}
+                      className="text-sky-400 hover:text-white text-xs px-1"
+                      title="Dismiss alert"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
                 {/* PIN Input Feedback */}
                 <div className="flex flex-col items-center my-auto">
@@ -848,14 +943,29 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                       </p>
                     </div>
                   </div>
-                  <button
-                    id="phone-lock-btn"
-                    onClick={handleLock}
-                    className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-[10px] font-medium flex items-center gap-1 shrink-0 border border-slate-700 transition-colors"
-                  >
-                    <Lock className="w-3 h-3 text-amber-400" />
-                    Lock
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div
+                      title={`Auto-Lock: Inactivity security timer active. Clears volatile RAM key in ${autoLockSecondsLeft}s.`}
+                      className={`px-1.5 py-1 rounded-lg text-[10px] font-mono border flex items-center gap-1 transition-all ${
+                        autoLockSecondsLeft <= 10
+                          ? 'bg-rose-950/90 border-rose-700 text-rose-300 animate-pulse'
+                          : autoLockSecondsLeft <= 18
+                          ? 'bg-amber-950/80 border-amber-700 text-amber-300'
+                          : 'bg-slate-900/90 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <Clock className={`w-3 h-3 ${autoLockSecondsLeft <= 10 ? 'text-rose-400' : 'text-sky-400'}`} />
+                      <span>{autoLockSecondsLeft}s</span>
+                    </div>
+                    <button
+                      id="phone-lock-btn"
+                      onClick={handleLock}
+                      className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-[10px] font-medium flex items-center gap-1 shrink-0 border border-slate-700 transition-colors"
+                    >
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      Lock
+                    </button>
+                  </div>
                 </div>
 
                 {/* Sub-view Content Area */}
@@ -1157,6 +1267,79 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
           isLockedOut={isLockedOut}
           throttledRemaining={throttledRemaining}
         />
+
+        {/* 30-Second Inactivity Auto-Lock & RAM Key Purge Control Deck */}
+        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-white">Inactivity Auto-Lock & RAM Purge</h3>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              SR-2 Protection
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            MLSU continuously monitors for inactivity. If the user steps away for <strong>30 seconds</strong>, the Credential Encrypted (CE) key is immediately zeroized and purged from RAM, preventing memory extraction (SR-2).
+          </p>
+
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Inactivity Timer Status:</span>
+              <span className="font-mono font-semibold flex items-center gap-1.5">
+                {isUnlocked ? (
+                  <>
+                    <span className={`w-2 h-2 rounded-full ${autoLockSecondsLeft <= 10 ? 'bg-rose-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+                    <span className={autoLockSecondsLeft <= 10 ? 'text-rose-400' : 'text-emerald-400'}>
+                      Armed ({autoLockSecondsLeft}s remaining)
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    Standby (Device Locked)
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Countdown Progress Bar */}
+            {isUnlocked && (
+              <div className="space-y-1">
+                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      autoLockSecondsLeft <= 10
+                        ? 'bg-rose-500 shadow-sm shadow-rose-500/50'
+                        : autoLockSecondsLeft <= 18
+                        ? 'bg-amber-500'
+                        : 'bg-sky-500'
+                    }`}
+                    style={{ width: `${(autoLockSecondsLeft / autoLockDuration) * 100}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>Active Session</span>
+                  <span>Auto-Lock at 0s</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+              <span className="text-slate-400 text-[11px]">Simulate 30s Inactivity Timeout:</span>
+              <button
+                id="simulate-autolock-btn"
+                disabled={!isUnlocked}
+                onClick={executeAutoLock}
+                className="px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-800/80 hover:bg-amber-900/80 disabled:opacity-30 disabled:pointer-events-none text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <Lock className="w-3 h-3 text-amber-400" />
+                Trigger Auto-Lock Now
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* System Integrity Dashboard: Real-time Memory, Entropy & Crypto Primitives */}
         <SystemIntegrityDashboard

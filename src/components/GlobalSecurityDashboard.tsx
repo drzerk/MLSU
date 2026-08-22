@@ -27,6 +27,7 @@ import {
   Sparkles,
   Server,
   AlertOctagon,
+  Package,
 } from 'lucide-react';
 import { MlsuKeyStore } from '../crypto/mlsuEngine';
 import { AuditLogEntry, ViewTab } from '../types';
@@ -611,6 +612,21 @@ export const GlobalSecurityDashboard: React.FC<GlobalSecurityDashboardProps> = (
                   >
                     <Cpu className="w-3.5 h-3.5" />
                     HSM & Tamper
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onNavigateTab('packer');
+                      onClose();
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      currentTab === 'packer'
+                        ? 'bg-sky-600 text-white border-sky-500'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    Firmware Packer
                   </button>
 
                   <button
