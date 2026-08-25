@@ -10,7 +10,7 @@
 | **Status** | Konzept + Stufe-0-Referenzmodell + interaktiver Simulator |
 | **Version** | 1.0 |
 | **Zielplattform** | Android / AOSP (primär, *nicht* implementiert), iOS (nur theoretisch) |
-| **Lizenz** | Dokumente CC BY-SA 4.0; Laufzeitcode im selben Geist, auditierbar |
+| **Lizenz** | Dokumente CC BY-SA 4.0 ([LICENSE](LICENSE)); Quellcode Apache-2.0 ([LICENSE-CODE](LICENSE-CODE)) |
 
 ---
 
@@ -22,7 +22,7 @@ Flashen, nichts, das echte Daten schützen darf.
 
 | Teil | Zweck | Einstieg |
 |---|---|---|
-| Interaktiver Simulator | Sperrbildschirm, Duress-Szenario, Slot-/Weaver-Inspektor, Timing-Rig | `npm install && npm run dev` |
+| Interaktiver Simulator | Sperrbildschirm, Duress-Szenario, Slot-/Weaver-Inspektor, HSM-Ansicht, Store-Layout, CLI, Timing-Rig, Spec-Viewer | `npm install && npm run dev` |
 | Python-Referenz | Argon2id + ChaCha20-Poly1305, persistenter Store, CLI | [`reference/README.md`](reference/README.md) |
 | C-Kern | Zweigfreie Auswahl (`fold_select`) als Spezifikation für einen AOSP-Pfad | `make -C reference/ct_core check` |
 
@@ -30,7 +30,7 @@ Flashen, nichts, das echte Daten schützen darf.
 
 ```bash
 npm install
-npm run dev          # http://0.0.0.0:3000  (PORT aus .env)
+npm run dev          # http://0.0.0.0:3000  (PORT/HOST als Umgebungsvariablen)
 npm test             # Vitest: Engine + Audit-Kette
 npm run typecheck
 npm run build && npm start
@@ -57,7 +57,8 @@ make -C ct_core check
 ```
 
 Architektur der Laufzeitsoftware: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-Konfiguration: [`.env.example`](.env.example).
+Unterstützte Umgebungsvariablen: [`.env.example`](.env.example) (dokumentiert
+sie — es gibt bewusst keinen `.env`-Loader).
 
 ---
 
@@ -492,6 +493,15 @@ Eines, das sie verschweigt, ist gefährlich.
 
 ## Lizenz
 
-Dieses Dokument steht unter
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.de).
-Siehe [LICENSE](LICENSE).
+Zwei Lizenzen, getrennt nach Inhaltsart:
+
+| Teil | Lizenz | Datei |
+|---|---|---|
+| Dokumente — dieses Konzeptpapier, `docs/` | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.de) | [LICENSE](LICENSE) |
+| Quellcode — `src/`, `reference/`, `server.ts`, Buildkonfiguration | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) | [LICENSE-CODE](LICENSE-CODE) |
+
+Der Grund für die Trennung ist praktisch: CC BY-SA ist keine
+Softwarelizenz, und ein AOSP-nahes Projekt kann Share-alike-Code nicht
+übernehmen. Da MLSU laut Entscheidung D4 ausdrücklich die Kooperation mit
+einem ROM-Projekt sucht, wäre eine reine CC-BY-SA-Lizenzierung ein
+selbstgebautes Hindernis. Siehe auch [NOTICE](NOTICE).

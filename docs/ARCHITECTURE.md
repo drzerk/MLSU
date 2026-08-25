@@ -36,6 +36,11 @@ logic plus an interactive explorer that makes the same mechanism visible.
 - No patch against `LockSettingsService`. The change points live as a sketch in [`p1-poc-skizze.md`](p1-poc-skizze.md).
 - No claim that SR-2 (no foreign keys in RAM) is proven. Python and JavaScript cannot prove it (finding F-2).
 - No claim of constant wall-clock time. The structure is constant; the runtime is not.
+- No build output. The *Store Layout* tab serializes the slot table into the fixed
+  binary layout and names the places an AOSP port would touch — it compiles nothing,
+  signs nothing, and produces nothing a device could boot.
+- No endorsement of biometrics. The biometric panel exists to show why decision D3
+  keeps them disabled in MLSU operation (concept §9.6), not to offer them.
 
 ## Data flow of one unlock
 
@@ -44,6 +49,13 @@ logic plus an interactive explorer that makes the same mechanism visible.
 3. `fold_select` over the flags (no early return).
 4. Hit: reset only the matched Weaver counter (SR-4). Miss: charge every counter (F-1).
 5. Session holds at most one profile key; `lock()` drops it.
+
+## Licensing
+
+Code in this repository is Apache-2.0 (`LICENSE-CODE`), documentation is
+CC BY-SA 4.0 (`LICENSE`). The split is deliberate: CC BY-SA is not a software
+licence and an AOSP-derived project could not take share-alike code, which
+would defeat decision D4 (seek co-operation with a ROM project).
 
 ## Persistence
 

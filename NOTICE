@@ -1,0 +1,15 @@
+Multi-Layer Secure Unlock (MLSU)
+Copyright 2026 drzerk
+
+This product includes software developed as a research reference model for
+the MLSU concept. It is not an Android build, it is not a product, and it
+must not be used to protect real data. See README.md, section 9 ("Grenzen,
+Risiken, offene Probleme") for what the concept does and does not claim.
+
+Licensing is split by content type:
+
+  Source code      Apache License 2.0   — see LICENSE-CODE
+                   (src/, reference/, server.ts, build configuration)
+
+  Documentation    CC BY-SA 4.0         — see LICENSE
+                   (README.md, README.en.md, docs/)

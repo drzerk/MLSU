@@ -4,7 +4,7 @@ import { PhoneSimulator } from './components/PhoneSimulator';
 import { DuressWalkthrough } from './components/DuressWalkthrough';
 import { SlotInspector } from './components/SlotInspector';
 import { HardwareHsmSimulator } from './components/HardwareHsmSimulator';
-import { FirmwarePacker } from './components/FirmwarePacker';
+import { StoreLayoutInspector } from './components/StoreLayoutInspector';
 import { CliTerminal } from './components/CliTerminal';
 import { BenchmarkRig } from './components/BenchmarkRig';
 import { DocumentationViewer } from './components/DocumentationViewer';
@@ -184,8 +184,8 @@ export function App() {
             onAddAuditLog={addAuditLog}
           />
         )}
-        {currentTab === 'packer' && (
-          <FirmwarePacker engine={engine} />
+        {currentTab === 'layout' && (
+          <StoreLayoutInspector engine={engine} />
         )}
         {currentTab === 'cli' && (
           <CliTerminal engine={engine} onStoreUpdated={handleStoreUpdated} />
@@ -215,7 +215,7 @@ export function App() {
             Multi-Layer Secure Unlock (MLSU) — Concept paper & reference verification model.
           </p>
           <p className="text-[11px] text-slate-600">
-            Open and auditable privacy architecture. Dual licensed under CC BY-SA 4.0 / Apache-2.0.
+            Open and auditable privacy architecture. Code under Apache-2.0, documents under CC BY-SA 4.0.
           </p>
         </div>
       </footer>

@@ -1,7 +1,17 @@
 Multi-Layer Secure Unlock (MLSU) — Konzeptpapier / concept paper
 Copyright (c) 2026 drzerk
 
-This work is licensed under the Creative Commons
+SCOPE: this file covers the DOCUMENTATION only — the concept paper
+(README.md, README.en.md), everything under docs/, and the prose parts of
+the README files in reference/.
+
+The SOURCE CODE of this repository (src/, reference/, server.ts and the
+build configuration) is licensed separately under the Apache License 2.0;
+see LICENSE-CODE. CC BY-SA is not a software licence, and AOSP-derived
+projects cannot take share-alike code — the split exists so that a ROM
+project could actually use this work.
+
+This documentation is licensed under the Creative Commons
 Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
 
 SPDX-License-Identifier: CC-BY-SA-4.0

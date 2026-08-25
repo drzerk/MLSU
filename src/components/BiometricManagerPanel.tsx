@@ -61,12 +61,15 @@ export const BiometricManagerPanel: React.FC<BiometricManagerPanelProps> = ({
               <h3 className="text-sm font-bold text-white tracking-tight">
                 Biometric Security Layer
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
-                Hardware Biometric Binding
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                D3: rejected for MLSU operation
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Simulates Secure Enclave / Titan M2 biometric token unwrap & profile routing
+              Explores what biometrics would do to the selection mechanism — and why decision D3 turns them off.
+              Biometrics cannot express a choice made by knowledge, and a finger that opens exactly one profile is
+              itself evidence that the other one exists (concept §9.6). Shown here to make that argument concrete,
+              not as a feature of the design.
             </p>
           </div>
         </div>
@@ -117,7 +120,8 @@ export const BiometricManagerPanel: React.FC<BiometricManagerPanelProps> = ({
             )}
           </div>
           <p className="text-[11px] text-slate-400 leading-snug">
-            Each finger directly unseals its linked profile via hardware keystore mapping.
+            Each finger unseals its linked profile. This is the variant D3 rejects: the mapping itself reveals how many
+            profiles exist to anyone who can enrol a finger.
           </p>
         </div>
 
@@ -243,12 +247,15 @@ export const BiometricManagerPanel: React.FC<BiometricManagerPanelProps> = ({
       <div className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl text-[11px] text-slate-400 space-y-1">
         <span className="font-semibold text-slate-300 flex items-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
-          Hardware Enclave Biometric Binding Principle:
+          Why D3 says "off", not "later":
         </span>
         <p className="leading-relaxed">
-          Biometric templates never store PINs in plaintext. Instead, the Secure Enclave releases an
-          ephemeral hardware-bound wrapping key upon authenticating the verified template, which unseals
-          the target slot without revealing the existence of remaining profiles.
+          A biometric template can be bound to a slot without ever storing a PIN — that part works. What does not work is
+          the property MLSU is built on: the PIN <em>selects</em> the profile, so an observer learns nothing from watching
+          an unlock. An enrolled finger is a persistent, enumerable object on the device that maps to exactly one profile,
+          and enrolling a second one for a second profile is a visible admission that the second profile exists. That is
+          why decision D3 keeps biometrics disabled in MLSU operation (concept §9.6) — this panel exists to show the
+          trade-off, not to offer it.
         </p>
       </div>
     </div>

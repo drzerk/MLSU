@@ -1281,7 +1281,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed">
-            MLSU continuously monitors for inactivity. If the user steps away for <strong>30 seconds</strong>, the Credential Encrypted (CE) key is immediately zeroized and purged from RAM, preventing memory extraction (SR-2).
+            After <strong>30 seconds</strong> of inactivity the model drops its reference to the Credential Encrypted (CE) key, which is what a device would do before evicting the key from the kernel keyring. This page cannot prove SR-2 and does not claim to: JavaScript copies byte arrays freely and zeroes nothing on free (finding F-2). SR-2 is a requirement on a native implementation, verifiable only by measurement on real hardware (M4).
           </p>
 
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">

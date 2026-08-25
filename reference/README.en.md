@@ -159,5 +159,8 @@ requirements and a methodological error in the rig itself:
 
 ## License
 
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
+The code in this directory is licensed under
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0), see
+[LICENSE-CODE](../LICENSE-CODE). The prose of this file, like the other
+documents, is [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
 see [LICENSE](../LICENSE).

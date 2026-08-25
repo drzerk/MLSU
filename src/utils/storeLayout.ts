@@ -29,7 +29,7 @@ export interface HexLine {
   category: BinarySection['category'];
 }
 
-export interface PackedFirmwareResult {
+export interface PackedStoreLayout {
   binary: Uint8Array;
   hexTotal: string;
   sections: BinarySection[];
@@ -81,13 +81,13 @@ async function computeSha256(data: Uint8Array): Promise<string> {
 }
 
 /**
- * Packages MLSU KDF and Slots into a canonical 400-byte binary firmware blob
+ * Packages MLSU KDF and Slots into a canonical 400-byte slot-table layout
  */
-export async function packMlsuFirmwareBlob(
+export async function packMlsuStoreImage(
   slots: GenericSlotInput[],
   kdf: KdfConfig,
   targetConfig: RomTargetConfig
-): Promise<PackedFirmwareResult> {
+): Promise<PackedStoreLayout> {
   const TOTAL_SIZE = 400; // 32 (Header) + 16 (KDF) + 320 (4 Slots x 80B) + 32 (Footer SHA-256)
   const buffer = new Uint8Array(TOTAL_SIZE);
   const view = new DataView(buffer.buffer);
@@ -221,7 +221,7 @@ export async function packMlsuFirmwareBlob(
   // Define Sections metadata
   const sections: BinarySection[] = [
     {
-      name: 'MLSU Firmware Header',
+      name: 'MLSU Layout Header',
       category: 'header',
       offsetStart: 0,
       offsetEnd: 31,
@@ -310,7 +310,7 @@ export async function packMlsuFirmwareBlob(
 
   // Generate C Header File for direct integration in AOSP system/vold
   const cHeaderCode = `/*
- * Multi-Layer Secure Unlock (MLSU) - Auto-Generated Firmware Table
+ * Multi-Layer Secure Unlock (MLSU) - Auto-generated slot-table layout (model output, not a build artefact)
  * Target OS: ${targetConfig.osName.toUpperCase()}
  * Architecture: ${targetConfig.targetArch}
  * Hardware Engine: ${targetConfig.hardwareEngine}
@@ -318,8 +318,8 @@ export async function packMlsuFirmwareBlob(
  * SHA-256 Digest: ${digestHex}
  */
 
-#ifndef MLSU_FIRMWARE_TABLE_H
-#define MLSU_FIRMWARE_TABLE_H
+#ifndef MLSU_SLOT_TABLE_H
+#define MLSU_SLOT_TABLE_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -328,7 +328,7 @@ export async function packMlsuFirmwareBlob(
 #define MLSU_FORMAT_VERSION 0x0100
 #define MLSU_SLOT_COUNT 4
 #define MLSU_SECTOR_SIZE 80
-#define MLSU_FIRMWARE_SIZE 400
+#define MLSU_SLOT_TABLE_SIZE 400
 
 #pragma pack(push, 1)
 
@@ -370,12 +370,12 @@ typedef struct {
     mlsu_kdf_params_t  kdf;
     mlsu_slot_sector_t slots[MLSU_SLOT_COUNT];
     uint8_t            sha256_checksum[32];
-} mlsu_firmware_blob_t;
+} mlsu_slot_table_t;
 
 #pragma pack(pop)
 
 /* Static binary payload embedded for initial device provisioning */
-static const uint8_t MLSU_DEFAULT_FIRMWARE_BLOB[MLSU_FIRMWARE_SIZE] = {
+static const uint8_t MLSU_DEFAULT_SLOT_TABLE[MLSU_SLOT_TABLE_SIZE] = {
 ${Array.from(buffer)
   .reduce<string[]>((acc, byte, idx) => {
     const hex = '0x' + byte.toString(16).padStart(2, '0').toUpperCase();
@@ -386,7 +386,7 @@ ${Array.from(buffer)
   .join(',\n')}
 };
 
-#endif /* MLSU_FIRMWARE_TABLE_H */
+#endif /* MLSU_SLOT_TABLE_H */
 `;
 
   // Generate AOSP Android.bp blueprint
@@ -448,7 +448,7 @@ allow mlsu_keystore_daemon metadata_file:file { create read write open getattr }
 /**
  * Downloads the binary file to user's disk
  */
-export function downloadFirmwareBlob(binary: Uint8Array, filename: string = 'mlsu-firmware-payload.bin'): void {
+export function downloadStoreImage(binary: Uint8Array, filename: string = 'mlsu-store-layout.bin'): void {
   const safeBuffer = new Uint8Array(binary);
   const blob = new Blob([safeBuffer], {
     type: 'application/octet-stream',
