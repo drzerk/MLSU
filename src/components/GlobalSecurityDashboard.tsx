@@ -616,17 +616,17 @@ export const GlobalSecurityDashboard: React.FC<GlobalSecurityDashboardProps> = (
 
                   <button
                     onClick={() => {
-                      onNavigateTab('packer');
+                      onNavigateTab('layout');
                       onClose();
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      currentTab === 'packer'
+                      currentTab === 'layout'
                         ? 'bg-sky-600 text-white border-sky-500'
                         : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
                     }`}
                   >
                     <Package className="w-3.5 h-3.5" />
-                    Firmware Packer
+                    Store Layout
                   </button>
 
                   <button

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { packMlsuFirmwareBlob, RomTargetConfig } from './firmwarePacker';
+import { packMlsuStoreImage, RomTargetConfig } from './storeLayout';
 import { KDF_FAST } from '../crypto/mlsuEngine';
 import { SlotData } from '../types';
 
-describe('Firmware Packer Utility', () => {
+describe('Store layout serializer', () => {
   const mockSlots: SlotData[] = [
     {
       index: 0,
@@ -66,7 +66,7 @@ describe('Firmware Packer Utility', () => {
   };
 
   it('packs binary blob with exact 400 bytes size and valid magic header', async () => {
-    const result = await packMlsuFirmwareBlob(mockSlots, KDF_FAST, mockTarget);
+    const result = await packMlsuStoreImage(mockSlots, KDF_FAST, mockTarget);
 
     expect(result.totalBytes).toBe(400);
     expect(result.binary.length).toBe(400);
@@ -93,15 +93,15 @@ describe('Firmware Packer Utility', () => {
     expect(result.sha256Digest).toHaveLength(64);
 
     // C Header code generated
-    expect(result.cHeaderCode).toContain('MLSU_FIRMWARE_TABLE_H');
-    expect(result.cHeaderCode).toContain('MLSU_DEFAULT_FIRMWARE_BLOB');
+    expect(result.cHeaderCode).toContain('MLSU_SLOT_TABLE_H');
+    expect(result.cHeaderCode).toContain('MLSU_DEFAULT_SLOT_TABLE');
 
     // Android.bp generated
     expect(result.aospBlueprintCode).toContain('libvold_mlsu');
   });
 
   it('correctly constructs hex lines and disassembler categories', async () => {
-    const result = await packMlsuFirmwareBlob(mockSlots, KDF_FAST, mockTarget);
+    const result = await packMlsuStoreImage(mockSlots, KDF_FAST, mockTarget);
 
     expect(result.hexLines.length).toBe(25); // 400 bytes / 16 bytes per line = 25 lines
     expect(result.sections.length).toBe(7); // Header, KDF, 4 Slots, Footer

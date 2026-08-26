@@ -163,5 +163,9 @@ Zielkonflikt zwischen zwei Anforderungen und ein Messfehler im eigenen Rig:
 
 ## Lizenz
 
+Der Code in diesem Verzeichnis steht unter
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0), siehe
+[LICENSE-CODE](../LICENSE-CODE). Die Prosa dieser Datei steht wie die
+übrigen Dokumente unter
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.de),
 siehe [LICENSE](../LICENSE).

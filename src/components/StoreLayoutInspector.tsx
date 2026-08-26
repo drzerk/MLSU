@@ -25,19 +25,19 @@ import {
 } from 'lucide-react';
 import { MlsuKeyStore } from '../crypto/mlsuEngine';
 import {
-  packMlsuFirmwareBlob,
-  downloadFirmwareBlob,
+  packMlsuStoreImage,
+  downloadStoreImage,
   downloadTextFile,
   RomTargetConfig,
-  PackedFirmwareResult,
+  PackedStoreLayout,
   BinarySection,
-} from '../utils/firmwarePacker';
+} from '../utils/storeLayout';
 
-interface FirmwarePackerProps {
+interface StoreLayoutInspectorProps {
   engine: MlsuKeyStore;
 }
 
-export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
+export const StoreLayoutInspector: React.FC<StoreLayoutInspectorProps> = ({ engine }) => {
   const [targetConfig, setTargetConfig] = useState<RomTargetConfig>({
     osName: 'grapheneos',
     targetArch: 'arm64-v8a',
@@ -48,20 +48,20 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
     romVersion: '14.0-QPR2',
   });
 
-  const [packedResult, setPackedResult] = useState<PackedFirmwareResult | null>(null);
+  const [packedResult, setPackedResult] = useState<PackedStoreLayout | null>(null);
   const [activeSectionFilter, setActiveSectionFilter] = useState<BinarySection['category'] | 'all'>('all');
   const [hoveredByteIndex, setHoveredByteIndex] = useState<number | null>(null);
   const [activeCodeTab, setActiveCodeTab] = useState<'cheader' | 'blueprint' | 'sepolicy' | 'json'>('cheader');
-  const [isBuildingRom, setIsBuildingRom] = useState<boolean>(false);
-  const [buildLogs, setBuildLogs] = useState<string[]>([]);
-  const [buildStep, setBuildStep] = useState<number>(0);
+  const [isWalking, setIsWalking] = useState<boolean>(false);
+  const [walkLogs, setWalkLogs] = useState<string[]>([]);
+  const [walkStep, setWalkStep] = useState<number>(0);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
 
-  // Pack the firmware whenever engine slots or targetConfig changes
+  // Re-serialize the slot table whenever engine slots or targetConfig changes
   useEffect(() => {
     let isMounted = true;
-    packMlsuFirmwareBlob(engine.slots, engine.kdf, targetConfig).then((res) => {
+    packMlsuStoreImage(engine.slots, engine.kdf, targetConfig).then((res) => {
       if (isMounted) {
         setPackedResult(res);
       }
@@ -77,65 +77,64 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
-  const handleSimulateRomBuild = () => {
-    if (isBuildingRom || !packedResult) return;
-    setIsBuildingRom(true);
-    setBuildStep(1);
-    setBuildLogs([
-      `[00:00.012] [INIT] Initializing MLSU ROM build pipeline for target: ${targetConfig.osName.toUpperCase()} (${targetConfig.targetArch})...`,
-      `[00:00.045] [CHECK] Validating 4-sector fixed alignment (SR-8): 400 bytes constant payload verified.`,
+  const handleWalkIntegrationPoints = () => {
+    if (isWalking || !packedResult) return;
+    setIsWalking(true);
+    setWalkStep(1);
+    setWalkLogs([
+      `[step 1/4] [SCOPE] Walking the integration points an MLSU port would touch for ${targetConfig.osName.toUpperCase()} (${targetConfig.targetArch}). Nothing is compiled here.`,
+      `[step 1/4] [LAYOUT] Slot table serialized in this browser: 4 records, 400 bytes, size independent of how many profiles are enrolled (SR-8).`,
     ]);
 
     setTimeout(() => {
-      setBuildStep(2);
-      setBuildLogs((prev) => [
+      setWalkStep(2);
+      setWalkLogs((prev) => [
         ...prev,
-        `[00:00.180] [KDF] Sealing KDF Profile (${engine.kdf.name.toUpperCase()} / TimeCost: ${engine.kdf.timeCost}, Mem: ${engine.kdf.memoryCostKiB} KiB).`,
-        `[00:00.320] [WEAVER] Binding hardware Weaver HAL client with StrongBox key master (${targetConfig.hardwareEngine.toUpperCase()}).`,
+        `[step 2/4] [KDF] KDF parameters recorded in the header (${engine.kdf.name.toUpperCase()} / TimeCost: ${engine.kdf.timeCost}, Mem: ${engine.kdf.memoryCostKiB} KiB). The browser uses PBKDF2 as a stand-in for Argon2id.`,
+        `[step 2/4] [WEAVER] A port would bind one Weaver slot per profile via IWeaver (${targetConfig.hardwareEngine.toUpperCase()}). Slot count is a device constant — read getConfig().slots on real hardware (M4), it is not known here.`,
       ]);
     }, 800);
 
     setTimeout(() => {
-      setBuildStep(3);
-      setBuildLogs((prev) => [
+      setWalkStep(3);
+      setWalkLogs((prev) => [
         ...prev,
-        `[00:00.640] [CC] Compiling system/vold/mlsu_ct.c with flags: -O3 -fstack-protector-strong -fPIC.`,
-        `[00:00.910] [SEPOLICY] Injected SELinux capability domain 'mlsu_keystore_daemon' into plat_sepolicy.cil.`,
+        `[step 3/4] [CT-CORE] The branch-free selection lives in reference/ct_core (C). A port would compile it into the unlock path — see docs/p1-poc-skizze.md §4.1.`,
+        `[step 3/4] [SEPOLICY] An SELinux domain would have to be written for the daemon holding the slot table. Not written, not reviewed.`,
       ]);
     }, 1700);
 
     setTimeout(() => {
-      setBuildStep(4);
-      setBuildLogs((prev) => [
+      setWalkStep(4);
+      setWalkLogs((prev) => [
         ...prev,
-        `[00:01.250] [IMAGE] Injecting static binary blob (SHA-256: ${packedResult.sha256Digest.slice(0, 16)}...) into boot.img ramdisk.`,
-        `[00:01.520] [AVB] Signing boot and system partitions with OEM verified boot certificate.`,
-        `[00:01.780] [SUCCESS] Simulated ROM Image built successfully! Ready for fastboot flashing.`,
+        `[step 4/4] [DIGEST] SHA-256 over the serialized layout: ${packedResult.sha256Digest.slice(0, 16)}… — computed in this browser over the bytes shown below.`,
+        `[step 4/4] [DONE] Walkthrough finished. No image was built, nothing was signed, and there is nothing to flash — MLSU has no AOSP implementation (see P1, milestones M0–M4).`,
       ]);
-      setBuildStep(5);
-      setIsBuildingRom(false);
+      setWalkStep(5);
+      setIsWalking(false);
     }, 2700);
   };
 
   const handleDownloadBinary = () => {
     if (!packedResult) return;
-    const filename = `mlsu-firmware-${targetConfig.osName}-${targetConfig.targetArch}.bin`;
-    downloadFirmwareBlob(packedResult.binary, filename);
+    const filename = `mlsu-store-layout-${targetConfig.osName}-${targetConfig.targetArch}.bin`;
+    downloadStoreImage(packedResult.binary, filename);
     setDownloadSuccessNotice(`Downloaded binary payload (${packedResult.totalBytes} bytes) as ${filename}`);
     setTimeout(() => setDownloadSuccessNotice(null), 4000);
   };
 
   const handleDownloadCHeader = () => {
     if (!packedResult) return;
-    downloadTextFile(packedResult.cHeaderCode, 'mlsu_firmware_table.h', 'text/x-c');
-    setDownloadSuccessNotice(`Downloaded C Header: mlsu_firmware_table.h`);
+    downloadTextFile(packedResult.cHeaderCode, 'mlsu_slot_table.h', 'text/x-c');
+    setDownloadSuccessNotice(`Downloaded C Header: mlsu_slot_table.h`);
     setTimeout(() => setDownloadSuccessNotice(null), 4000);
   };
 
   const handleDownloadManifest = () => {
     if (!packedResult) return;
     const manifest = {
-      format: 'mlsu_firmware_package',
+      format: 'mlsu_store_layout_model',
       version: '1.0',
       generated: new Date().toISOString(),
       target: targetConfig,
@@ -152,8 +151,8 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
         hex: packedResult.hexTotal,
       },
     };
-    downloadTextFile(JSON.stringify(manifest, null, 2), 'mlsu-build-manifest.json', 'application/json');
-    setDownloadSuccessNotice(`Downloaded build package manifest: mlsu-build-manifest.json`);
+    downloadTextFile(JSON.stringify(manifest, null, 2), 'mlsu-store-layout-manifest.json', 'application/json');
+    setDownloadSuccessNotice(`Downloaded layout manifest: mlsu-store-layout-manifest.json`);
     setTimeout(() => setDownloadSuccessNotice(null), 4000);
   };
 
@@ -177,41 +176,44 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5 font-semibold">
                 <Package className="w-3.5 h-3.5" />
-                AOSP / GrapheneOS ROM Packaging Tool
+                Store Layout Inspector — model, not a build
               </span>
               <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                 Constant 400 Bytes (SR-8)
               </span>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                Zero-Leakage Verified
+              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                Nothing here is flashable
               </span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              ROM Firmware Packer & Binary Blob Synthesizer
+              Store Layout & Slot Table Inspector
             </h1>
             <p className="text-sm text-slate-300 max-w-3xl leading-relaxed">
-              Synthesize a flashable ROM firmware payload directly from the active cryptographic state. Packages
-              the <strong>Argon2id KDF parameters</strong>, <strong>4 fixed 80-byte sector tables</strong>, and a <strong>SHA-256 Secure Boot seal</strong> for seamless embedding into native Android daemons (<code className="text-sky-300 font-mono text-xs">system/vold</code>).
+              Serializes the active slot table into the fixed binary layout the reference model uses, and shows where
+              such a table <em>would</em> be bound if someone integrated MLSU into an AOSP tree: <strong>KDF parameters</strong>,{' '}
+              <strong>4 fixed 80-byte slot records</strong> and a <strong>SHA-256 digest</strong> over the result.
+              The walkthrough below names the integration points (<code className="text-sky-300 font-mono text-xs">system/vold</code>, sepolicy,
+              build blueprint) — it does not compile, sign or produce anything a device could boot.
             </p>
           </div>
 
           {/* Quick Action Button */}
           <div className="flex items-center gap-2 shrink-0">
             <button
-              id="simulate-build-rom-btn"
-              onClick={handleSimulateRomBuild}
-              disabled={isBuildingRom}
+              id="walk-integration-points-btn"
+              onClick={handleWalkIntegrationPoints}
+              disabled={isWalking}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-sky-950 transition-all cursor-pointer"
             >
-              {isBuildingRom ? (
+              {isWalking ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  <span>Building ROM Image...</span>
+                  <span>Walking integration points…</span>
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4 text-white" />
-                  <span>Simulate ROM Build</span>
+                  <span>Walk Integration Points</span>
                 </>
               )}
             </button>
@@ -235,15 +237,15 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
         </div>
       )}
 
-      {/* Grid: ROM Target Configuration & Build Simulator Stepper */}
+      {/* Grid: target platform + integration walkthrough */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: ROM Configuration Specs (5 Cols) */}
+        {/* Left column: target platform specs (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-sky-400" />
-                <h2 className="text-sm font-semibold text-white">Target ROM & Platform Specs</h2>
+                <h2 className="text-sm font-semibold text-white">Target Platform (hypothetical port)</h2>
               </div>
               <span className="text-[10px] font-mono text-slate-400">fscrypt v2 / Weaver</span>
             </div>
@@ -331,7 +333,7 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
               <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                 <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
                   <span className="text-slate-500 block">KDF Mode:</span>
-                  <span className="text-amber-400 font-semibold">{engine.kdf.name.toUpperCase()} (Argon2id)</span>
+                  <span className="text-amber-400 font-semibold">{engine.kdf.name.toUpperCase()} (PBKDF2 stand-in)</span>
                 </div>
                 <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
                   <span className="text-slate-500 block">Payload Footprint:</span>
@@ -371,24 +373,24 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
           </div>
         </div>
 
-        {/* Right Column: Build Terminal & Simulation Stepper (7 Cols) */}
+        {/* Right column: integration walkthrough (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-white">ROM Image Compilation Engine</h2>
+                <h2 className="text-sm font-semibold text-white">AOSP Integration Points (walkthrough)</h2>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono">
-                {isBuildingRom ? (
+                {isWalking ? (
                   <span className="text-amber-400 flex items-center gap-1">
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                    Synthesizing...
+                    Walking…
                   </span>
-                ) : buildStep === 5 ? (
+                ) : walkStep === 5 ? (
                   <span className="text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Build Ready
+                    Walkthrough done
                   </span>
                 ) : (
                   <span className="text-slate-500">Idle / Ready</span>
@@ -399,15 +401,15 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
             {/* Build Stepper Progress Bar */}
             <div className="grid grid-cols-4 gap-2 text-xs">
               {[
-                { step: 1, label: 'Pre-flight & Align' },
-                { step: 2, label: 'KDF & Weaver Seal' },
-                { step: 3, label: 'vold Native CC' },
-                { step: 4, label: 'AVB Sign & Image' },
+                { step: 1, label: 'Layout & Alignment' },
+                { step: 2, label: 'KDF & Weaver Binding' },
+                { step: 3, label: 'ct_core & sepolicy' },
+                { step: 4, label: 'Digest & Limits' },
               ].map((s) => (
                 <div
                   key={s.step}
                   className={`p-2.5 rounded-xl border transition-all text-center ${
-                    buildStep >= s.step
+                    walkStep >= s.step
                       ? 'bg-sky-950/80 border-sky-700 text-sky-200'
                       : 'bg-slate-950 border-slate-800/80 text-slate-500'
                   }`}
@@ -420,18 +422,18 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
 
             {/* Live Terminal Output Console */}
             <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin">
-              {buildLogs.length === 0 ? (
+              {walkLogs.length === 0 ? (
                 <div className="text-slate-500 py-6 text-center italic">
-                  Press <strong>"Simulate ROM Build"</strong> above to run the full AOSP/GrapheneOS firmware packaging pipeline.
+                  Press <strong>"Walk Integration Points"</strong> above to step through the places an AOSP port would have to touch.
                 </div>
               ) : (
-                buildLogs.map((log, idx) => (
+                walkLogs.map((log, idx) => (
                   <div
                     key={idx}
                     className={`leading-relaxed ${
-                      log.includes('[SUCCESS]')
+                      log.includes('[DONE]')
                         ? 'text-emerald-400 font-semibold'
-                        : log.includes('[CHECK]')
+                        : log.includes('[LAYOUT]')
                         ? 'text-sky-300'
                         : log.includes('[WEAVER]') || log.includes('[KDF]')
                         ? 'text-amber-300'
@@ -444,11 +446,11 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
               )}
             </div>
 
-            {/* Firmware Integrity Digest Card */}
+            {/* Layout digest card */}
             {packedResult && (
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">SHA-256 Secure Boot Seal</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">SHA-256 over the serialized layout</span>
                   <span className="text-sky-400 font-semibold select-all break-all text-[11px]">
                     {packedResult.sha256Digest}
                   </span>
@@ -474,7 +476,7 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
             <Binary className="w-5 h-5 text-indigo-400" />
             <div>
               <h2 className="text-base font-bold text-white tracking-tight">
-                Binary Firmware Blob & Hex Disassembler
+                Serialized Slot Table & Hex View
               </h2>
               <p className="text-xs text-slate-400">
                 Live interactive memory view of the 400-byte payload structured in 16-byte rows. Hover over bytes or click sections to inspect.
@@ -628,7 +630,7 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
                 activeCodeTab === 'cheader' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              mlsu_firmware_table.h (C Header)
+              mlsu_slot_table.h (C Header)
             </button>
             <button
               onClick={() => setActiveCodeTab('blueprint')}
@@ -679,10 +681,21 @@ export const FirmwarePacker: React.FC<FirmwarePackerProps> = ({ engine }) => {
       <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-3">
         <div className="flex items-center gap-2 text-sky-400 font-semibold">
           <Shield className="w-4 h-4" />
-          <span>Why Fixed-Size Binary Packing is Crucial for Privacy (SR-8)</span>
+          <span>Why the table has a fixed size — and what that does not buy (SR-8)</span>
         </div>
         <p className="leading-relaxed">
-          In standard Android systems, user accounts dynamically increase filesystem directory counts and metadata records. MLSU eliminates this side-channel by allocating a <strong>strict 4-sector fixed table</strong> of exactly 400 bytes. Unallocated or decoy profiles are padded with cryptographically indistinguishable random noise so a physical NAND examiner or forensic dump cannot distinguish between 1 active profile, 2 active profiles, or all 4 slots.
+          In standard Android, adding a user changes directory counts and metadata records. MLSU keeps a{' '}
+          <strong>fixed table of 4 records / 400 bytes</strong>: enrolling a profile does not change the size, and empty
+          records hold random bytes that no PIN opens. What that achieves is narrow but real — the <em>length</em> of the
+          table says nothing about how many profiles exist.
+        </p>
+        <p className="leading-relaxed text-amber-200/90">
+          What it does <strong>not</strong> achieve: the reference implementation keeps a status byte per record so a fresh
+          process knows which slot is free — a documented deviation from SR-8, readable by anyone who can read the store
+          (see <code className="font-mono text-[11px]">reference/README.md</code>). And a fixed-size table says nothing
+          about the storage layer underneath it: flash wear-levelling keeps old blocks, and reconstruction via chip-off or
+          the FTL is exactly the attacker class (A5) that MLSU does <strong>not</strong> claim to defeat (concept §9.2).
+          Deniability is claimed against A2/A3 only.
         </p>
       </div>
     </div>

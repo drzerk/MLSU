@@ -10,7 +10,7 @@
 | **Status** | Concept + Stufe-0 reference model + interactive simulator |
 | **Version** | 1.0 |
 | **Target platform** | Android / AOSP (primary, *not* implemented), iOS (theoretical only) |
-| **Licence** | Documents CC BY-SA 4.0; runtime code in the same auditable spirit |
+| **Licence** | Documents CC BY-SA 4.0 ([LICENSE](LICENSE)); source code Apache-2.0 ([LICENSE-CODE](LICENSE-CODE)) |
 
 ---
 
@@ -22,7 +22,7 @@ flash, nothing that may protect real data.
 
 | Piece | Purpose | Start here |
 |---|---|---|
-| Interactive simulator | Lock screen, duress walk-through, slot/Weaver inspector, timing rig | `npm install && npm run dev` |
+| Interactive simulator | Lock screen, duress walk-through, slot/Weaver inspector, HSM view, store layout, CLI, timing rig, spec viewer | `npm install && npm run dev` |
 | Python reference | Argon2id + ChaCha20-Poly1305, persistent store, CLI | [`reference/README.en.md`](reference/README.en.md) |
 | C core | Branch-free selection (`fold_select`) as a spec for an AOSP path | `make -C reference/ct_core check` |
 
@@ -30,7 +30,7 @@ flash, nothing that may protect real data.
 
 ```bash
 npm install
-npm run dev          # http://0.0.0.0:3000  (PORT from .env)
+npm run dev          # http://0.0.0.0:3000  (PORT/HOST as environment variables)
 npm test             # Vitest: engine + audit chain
 npm run typecheck
 npm run build && npm start
@@ -57,7 +57,8 @@ make -C ct_core check
 ```
 
 Runtime architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-Configuration: [`.env.example`](.env.example).
+Supported environment variables: [`.env.example`](.env.example) (it documents
+them — there is deliberately no `.env` loader).
 
 ---
 
@@ -477,6 +478,14 @@ is usable for its target audience. One that conceals them is dangerous.
 
 ## License
 
-This document is licensed under
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-See [LICENSE](LICENSE).
+Two licences, split by content type:
+
+| Part | Licence | File |
+|---|---|---|
+| Documents — this concept paper, `docs/` | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | [LICENSE](LICENSE) |
+| Source code — `src/`, `reference/`, `server.ts`, build configuration | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) | [LICENSE-CODE](LICENSE-CODE) |
+
+The reason for the split is practical: CC BY-SA is not a software licence,
+and an AOSP-derived project cannot take share-alike code. Since decision D4
+explicitly aims at co-operation with a ROM project, licensing the code under
+CC BY-SA alone would be an obstacle of our own making. See also [NOTICE](NOTICE).
