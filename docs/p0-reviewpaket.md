@@ -49,7 +49,7 @@ es aber nicht.
 
 | ID | Reviewer | Warum | Kanal (geprüft 2026-08-19) | Entwurf | Versand | Rücklauf |
 |---|---|---|---|---|---|---|
-| **R1** | GrapheneOS | Hat den Duress-Mechanismus real gebaut — die Gegenantwort auf MLSU | Diskussionsforum `discuss.grapheneos.org` (offizieller Diskussionskanal; Reddit verweist dorthin); Rückfallebene `contact@grapheneos.org` | [A](#4-entwurf-a--grapheneos-forumsbeitrag-en) | offen | – |
+| **R1** | GrapheneOS | Hat den Duress-Mechanismus real gebaut — die Gegenantwort auf MLSU | Diskussionsforum `discuss.grapheneos.org` (offizieller Diskussionskanal; Reddit verweist dorthin); Rückfallebene `contact@grapheneos.org` | [A](#4-entwurf-a--grapheneos-forumsbeitrag-en) → **[versandfertiger Text](outbox/r1-grapheneos.md)** | offen | – |
 | **R2** | CalyxOS | Zweites ROM-Projekt mit eigener Sicherheitskultur; Feature-Anfragen laufen offiziell über GitLab | GitLab-Issue `CalyxOS/calyxos` (seit 2025-09 offizieller Kanal für Feature-/Funktionsanfragen); optional Matrix-Ping `@calyx_institute:matrix.org` | [B](#5-entwurf-b--calyxos-gitlab-issue-en) | offen | – |
 | **R3** | Forensik-Praxis | Beantwortet AB-1 und die Metadaten-Fragen aus Praktikersicht | Forum `forensicfocus.com/forums` (aktive DFIR-Community) | [C](#6-entwurf-c--forensik-forumsbeitrag-en) | offen | – |
 | **R4** | Rechtswissenschaft | Beantwortet P0-Fragen 8/9 — die das Projekt kippen können | Persönliche Anfrage (Lehrstuhl IT-/Strafrecht, Fachanwalt) | [D](#7-entwurf-d--rechtswissenschaft-vorlage-en) | offen | – |
