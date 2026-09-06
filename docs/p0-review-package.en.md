@@ -48,7 +48,7 @@ replace it.
 
 | ID | Reviewer | Why | Channel (checked 2026-08-19) | Draft | Sent | Response |
 |---|---|---|---|---|---|---|
-| **R1** | GrapheneOS | Has actually built the duress mechanism — the counter-answer to MLSU | Discussion forum `discuss.grapheneos.org` (official discussion channel; Reddit redirects there); fallback `contact@grapheneos.org` | [A](#4-draft-a--grapheneos-forum-post-en) | open | – |
+| **R1** | GrapheneOS | Has actually built the duress mechanism — the counter-answer to MLSU | Discussion forum `discuss.grapheneos.org` (official discussion channel; Reddit redirects there); fallback `contact@grapheneos.org` | [A](#4-draft-a--grapheneos-forum-post-en) → **[ready-to-send text](outbox/r1-grapheneos.md)** | open | – |
 | **R2** | CalyxOS | Second ROM project with its own security culture; feature requests officially run via GitLab | GitLab issue `CalyxOS/calyxos` (official channel for feature/functionality requests since 2025-09); optional Matrix ping `@calyx_institute:matrix.org` | [B](#5-draft-b--calyxos-gitlab-issue-en) | open | – |
 | **R3** | Forensic practice | Answers AB-1 and the metadata questions from a practitioner's view | Forum `forensicfocus.com/forums` (active DFIR community) | [C](#6-draft-c--forensics-forum-post-en) | open | – |
 | **R4** | Legal scholarship | Answers P0 questions 8/9 — which can kill the project | Personal request (university chair for IT/criminal law, specialized lawyer) | [D](#7-draft-d--legal-template-en) | open | – |
